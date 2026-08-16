@@ -19,55 +19,6 @@ It takes the user's **starting point, destination, duration, budget, travel styl
 
 > ⚠️ AI-generated routes, recommendations, estimated costs, and travel information are planning suggestions and should be verified before booking.
 
-## ▶️ How to Run
-
-Follow these steps to run GoTrip AI locally.
-
-```text
-1. Create and activate a virtual environment
-
-macOS / Linux:
-python3 -m venv .venv
-source .venv/bin/activate
-
-Windows:
-.venv\Scripts\activate
-
-
-2. Install dependencies
-
-pip install -r requirements.txt
-
-
-3. Configure environment variables
-
-Create a .env file in the project root:
-
-GROQ_API_KEY=your_groq_api_key
-DATABASE_URL=your_postgresql_url
-TAVILY_API_KEY=your_tavily_api_key
-
-
-4. Start the FastAPI server
-
-python app.py
-
-Or:
-
-uvicorn app:app --reload
-
-The server will start at:
-http://127.0.0.1:8000
-
-
-5. Open GoTrip AI
-
-Open this URL in your browser:
-http://127.0.0.1:8000
-
-
-
-
 ## 🧠 How It Works
 
 ```text
@@ -313,7 +264,7 @@ __pycache__/
 
 If a real API key is accidentally pushed to GitHub, revoke or rotate it immediately.
 
-## 🚀 Local Setup
+## 🚀 How to Run
 
 ### 1. Clone the repository
 
