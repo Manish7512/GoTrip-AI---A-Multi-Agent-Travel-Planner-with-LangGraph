@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GoTrip AI — Intelligent Travel Planner</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}?v=3">
+</head>
+
+<body>
+    <header class="topbar">
+        <div class="brand">
+            <div class="brand-logo">✦</div>
+            <div>GoTrip <span>AI</span></div>
+        </div>
+
+        <nav>
+            <a class="active" href="#planner">Planner</a>
+            <a href="#itinerary">My trip</a>
+            <a href="#agents">AI team</a>
+        </nav>
+
+        <div class="thread-display">
+            <span class="thread-label">Thread ID</span>
+            <code id="threadIdDisplay">Loading...</code>
+            <button id="copyThreadId" type="button">Copy</button>
+        </div>
+
+        <button class="profile-btn" type="button">MP</button>
+    </header>
+
+    <main class="app-shell">
+        <section class="hero">
+            <div>
+                <div class="eyebrow"><i></i> AI TRAVEL WORKSPACE</div>
+                <h1>Plan your perfect<br><span>trip with AI.</span></h1>
+                <p>
+                    Enter where you are starting from, where you want to go,
+                    your duration, budget and preferences. GoTrip uses those
+                    exact values to build your trip.
+                </p>
+            </div>
+
+            <div class="hero-mini">
+                <span>✦</span>
+                <div>
+                    <b>Multi-agent planning</b>
+                    <small>Powered by LangGraph</small>
+                </div>
+            </div>
+        </section>
+
+        <section class="workspace" id="planner">
+
+            <div class="left-column">
+
+                <div class="prompt-card">
+                    <div class="card-label"><span>✦</span> TRIP BRIEF</div>
+
+                    <textarea
+                        id="prompt"
+                        placeholder="Optional: Tell GoTrip anything specific about this trip..."
+                    ></textarea>
+
+                    <div class="quick-chips">
+                        <button
+                            type="button"
+                            data-prompt="Plan a 5-day budget trip focused on beaches and food."
+                            data-destination="Bali"
+                            data-days="5"
+                        >
+                            🏝️ Beach escape
+                        </button>
+
+                        <button
+                            type="button"
+                            data-prompt="Plan a 7-day trip focused on food, culture and photography."
+                            data-destination="Japan"
+                            data-days="7"
+                        >
+                            🇯🇵 Japan culture
+                        </button>
+
+                        <button
+                            type="button"
+                            data-prompt="Plan a luxury 6-day Europe trip with great hotels and experiences."
+                            data-destination="Europe"
+                            data-days="6"
+                        >
+                            ✨ Luxury Europe
+                        </button>
+                    </div>
+
+                    <div class="brief-row">
+                        <div class="field">
+                            <label for="source">STARTING FROM</label>
+                            <input
+                                id="source"
+                                type="text"
+                                placeholder="Delhi, Mumbai, Lucknow..."
+                                autocomplete="off"
+                            >
+                        </div>
+
+                        <div class="field">
+                            <label for="destination">DESTINATION</label>
+                            <input
+                                id="destination"
+                                type="text"
+                                placeholder="Japan, Bali, Paris..."
+                                autocomplete="off"
+                            >
+                        </div>
+                    </div>
+
+                    <div class="brief-row">
+                        <div class="field">
+                            <label for="days">DURATION</label>
+                            <input
+                                id="days"
+                                type="number"
+                                min="1"
+                                max="365"
+                                value="7"
+                                inputmode="numeric"
+                            >
+                        </div>
+
+                        <div class="field">
+                            <label for="budget">BUDGET (INR)</label>
+                            <input
+                                id="budget"
+                                type="text"
+                                placeholder="120000 or 1.2 lakh"
+                                autocomplete="off"
+                            >
+                        </div>
+                    </div>
+
+                    <div class="brief-row second">
+                        <div class="field wide">
+                            <label for="style">TRAVEL STYLE</label>
+                            <select id="style">
+                                <option>Balanced</option>
+                                <option>Budget</option>
+                                <option>Luxury</option>
+                                <option>Adventure</option>
+                                <option>Relaxed</option>
+                            </select>
+                        </div>
+
+                        <div class="field wide">
+                            <label for="interests">INTERESTS</label>
+                            <input
+                                id="interests"
+                                type="text"
+                                placeholder="Food, culture, nature..."
+                                autocomplete="off"
+                            >
+                        </div>
+                    </div>
+
+                    <button class="generate" id="generateBtn" type="button">
+                        <span>✦</span>
+                        <b id="generateLabel">Build my trip</b>
+                        <strong>→</strong>
+                    </button>
+                </div>
+
+                <div class="agents-card" id="agents">
+                    <div class="card-heading">
+                        <div>
+                            <span class="card-label">AI TEAM</span>
+                            <h2>Agents working together</h2>
+                        </div>
+                        <span class="live"><i></i> LIVE</span>
+                    </div>
+
+                    <div class="agent-list">
+                        <div class="agent-row" data-agent="flight">
+                            <div class="agent-symbol purple">✈</div>
+                            <div>
+                                <div class="agent-name">Flight Agent</div>
+                                <small>Finding transport from your starting point</small>
+                            </div>
+                            <span class="agent-state">Ready</span>
+                        </div>
+
+                        <div class="agent-row" data-agent="hotel">
+                            <div class="agent-symbol green">⌂</div>
+                            <div>
+                                <div class="agent-name">Hotel Agent</div>
+                                <small>Finding stays within your trip requirements</small>
+                            </div>
+                            <span class="agent-state">Ready</span>
+                        </div>
+
+                        <div class="agent-row" data-agent="route">
+                            <div class="agent-symbol cyan">⌁</div>
+                            <div>
+                                <div class="agent-name">Route Agent</div>
+                                <small>Building the source-to-destination route</small>
+                            </div>
+                            <span class="agent-state">Ready</span>
+                        </div>
+
+                        <div class="agent-row" data-agent="itinerary">
+                            <div class="agent-symbol cyan">✦</div>
+                            <div>
+                                <div class="agent-name">Itinerary Agent</div>
+                                <small>Building a practical day-by-day plan</small>
+                            </div>
+                            <span class="agent-state">Ready</span>
+                        </div>
+
+                        <div class="agent-row" data-agent="final">
+                            <div class="agent-symbol orange">✓</div>
+                            <div>
+                                <div class="agent-name">Final Agent</div>
+                                <small>Combining everything into your final trip</small>
+                            </div>
+                            <span class="agent-state">Ready</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="right-column">
+
+                <div class="trip-summary">
+                    <div>
+                        <span class="card-label">YOUR JOURNEY</span>
+                        <h2 id="tripTitle">Your Journey</h2>
+                        <p id="tripMeta">Enter your trip details to begin</p>
+                    </div>
+
+                    <div class="score">
+                        <span>AI SCORE</span>
+                        <b id="score">—</b>
+                        <small>/100</small>
+                    </div>
+                </div>
+
+                <div class="map-card">
+                    <div class="map-top">
+                        <span>ROUTE</span>
+                        <button id="mapMode" type="button">◉ Smart route</button>
+                    </div>
+
+                    <div class="map" id="routeMap">
+                        <div class="grid-lines"></div>
+
+                        <div class="route-empty" id="routeEmpty">
+                            Generate your trip to see the route.
+                        </div>
+
+                        <svg
+                            id="routeSvg"
+                            viewBox="0 0 700 300"
+                            preserveAspectRatio="none"
+                            aria-hidden="true"
+                        ></svg>
+
+                        <div id="routePoints"></div>
+                    </div>
+
+                    <div class="route-bottom" id="routeBottom">
+                        <span>Your starting point and destination will appear here.</span>
+                    </div>
+                </div>
+
+                <div class="itinerary-card" id="itinerary">
+                    <div class="card-heading">
+                        <div>
+                            <span class="card-label">AI ITINERARY</span>
+                            <h2>Recommended journey</h2>
+                        </div>
+
+                        <button class="ghost" id="regenerate" type="button">
+                            ↻ Regenerate
+                        </button>
+                    </div>
+
+                    <div class="day-tabs" id="dayTabs"></div>
+
+                    <div id="dayContent" class="day-content">
+                        <div class="empty-state">
+                            <h3>Your itinerary is waiting</h3>
+                            <p>
+                                Enter your starting point, destination,
+                                duration, budget and preferences.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="budget-card">
+                    <div>
+                        <div>
+                            <span class="card-label">TRIP BUDGET</span>
+                            <h3 id="estimatedBudget">—</h3>
+                        </div>
+                        <span class="budget-status" id="budgetStatus">
+                            Waiting for trip
+                        </span>
+                    </div>
+
+                    <div class="budget-bars">
+                        <div>
+                            <span>Flights / transport</span>
+                            <b id="flightBudget">See itinerary</b>
+                            <i id="flightBudgetBar"></i>
+                        </div>
+
+                        <div>
+                            <span>Stay</span>
+                            <b id="hotelBudget">See itinerary</b>
+                            <i id="hotelBudgetBar"></i>
+                        </div>
+
+                        <div>
+                            <span>Activities + food</span>
+                            <b id="activityBudget">See itinerary</b>
+                            <i id="activityBudgetBar"></i>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+    </main>
+
+    <div class="ai-chat" id="aiChat">
+        <button class="chat-toggle" id="chatToggle" type="button">
+            ✦ <span>Ask GoTrip AI</span>
+        </button>
+
+        <div class="chat-window">
+            <div class="chat-head">
+                <div>
+                    <b>GoTrip AI</b>
+                    <small>Your travel copilot</small>
+                </div>
+                <button id="closeChat" type="button">×</button>
+            </div>
+
+            <div class="messages" id="messages">
+                <div class="bot-msg">
+                    Generate a trip first, then ask me to refine the route,
+                    budget or itinerary.
+                </div>
+            </div>
+
+            <div class="chat-input">
+                <input
+                    id="chatInput"
+                    placeholder="Ask anything about your trip..."
+                    autocomplete="off"
+                >
+                <button id="sendChat" type="button">→</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="{{ url_for('static', path='script.js') }}?v=3"></script>
+</body>
+</html>
