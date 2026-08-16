@@ -24,6 +24,13 @@ load_dotenv()
 os.environ["SSL_CERT_FILE"] = certifi.where()
 os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
 
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+if not GROQ_API_KEY:
+    raise ValueError(
+        "GROQ_API_KEY is missing. Please check your .env file."
+    )
+
 
 def required_env(name: str) -> str:
     value = os.getenv(name)
@@ -39,12 +46,16 @@ def database_url() -> str:
     return value
 
 
+# llm = ChatGroq(
+#     model="llama-3.3-70b-versatile",
+#     groq_api_key=required_env("GROQ_API_KEY"),
+#     temperature=0.2,
+# )
 llm = ChatGroq(
-    model="llama-3.3-70b-versatile",
-    groq_api_key=required_env("GROQ_API_KEY"),
-    temperature=0.2,
+    model="llama-3.1-8b-instant",
+    groq_api_key=GROQ_API_KEY,
+    temperature=0.2
 )
-
 
 class TravelState(TypedDict):
     messages: Annotated[list[AnyMessage], operator.add]
@@ -131,7 +142,7 @@ when reliable information is available.
     }
 
 
-def route_agent(state: TravelState):
+def build_route(state: TravelState):
     """
     Route is generated independently and always has a fallback.
 
@@ -212,7 +223,7 @@ Rules:
 
         return {
             "route": final_route,
-            "messages": [AIMessage(content="Route Agent completed.")],
+            "messages": [AIMessage(content="Route generated successfully.")],
             "llm_calls": state.get("llm_calls", 0) + 1,
         }
 
@@ -221,13 +232,21 @@ Rules:
 
         return {
             "route": fallback,
-            "messages": [AIMessage(content="Route Agent used source-to-destination fallback.")],
+            "messages": [AIMessage(content="Route fallback generated successfully.")],
             "llm_calls": state.get("llm_calls", 0) + 1,
         }
 
 
 def itinerary_agent(state: TravelState):
-    route_text = " → ".join(item["name"] for item in state["route"])
+    
+    route_result = build_route(state)
+
+    route = route_result["route"]
+
+    route_text = " → ".join(
+        item["name"]
+        for item in route
+    )
 
     prompt = f"""
 Create a practical {state["days"]}-day travel itinerary.
@@ -254,16 +273,22 @@ Requirements:
 """.strip()
 
     response = llm.invoke([
-        SystemMessage(content="You are an expert practical travel planner."),
+        SystemMessage(
+            content="You are an expert practical travel planner."
+        ),
         HumanMessage(content=prompt),
     ])
 
     return {
+        "route": route,
         "itinerary": str(response.content),
         "messages": [response],
-        "llm_calls": state.get("llm_calls", 0) + 1,
+        "llm_calls": (
+            state.get("llm_calls", 0)
+            + route_result.get("llm_calls", 0)
+            + 1
+        ),
     }
-
 
 def calculate_score(state: TravelState) -> int:
     score = 80
@@ -338,14 +363,12 @@ graph = StateGraph(TravelState)
 
 graph.add_node("flight_agent", flight_agent)
 graph.add_node("hotel_agent", hotel_agent)
-graph.add_node("route_agent", route_agent)
 graph.add_node("itinerary_agent", itinerary_agent)
 graph.add_node("final_agent", final_agent)
 
 graph.add_edge(START, "flight_agent")
 graph.add_edge("flight_agent", "hotel_agent")
-graph.add_edge("hotel_agent", "route_agent")
-graph.add_edge("route_agent", "itinerary_agent")
+graph.add_edge("hotel_agent", "itinerary_agent")
 graph.add_edge("itinerary_agent", "final_agent")
 graph.add_edge("final_agent", END)
 

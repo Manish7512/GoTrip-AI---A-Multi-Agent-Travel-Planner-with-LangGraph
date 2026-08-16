@@ -311,13 +311,13 @@ function setAgentState(agent, state) {
 
 
 function resetAgents() {
-    ["flight", "hotel", "route", "itinerary", "final"]
+    ["flight", "hotel", "itinerary", "final"]
         .forEach(agent => setAgentState(agent, "Ready"));
 }
 
 
 async function animateAgents() {
-    const agents = ["flight", "hotel", "route", "itinerary", "final"];
+    const agents = ["flight", "hotel", "itinerary", "final"];
 
     resetAgents();
 
