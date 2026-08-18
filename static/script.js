@@ -547,40 +547,75 @@ function extractDaySections(text) {
     }));
 }
 
-
 function renderItinerary(data) {
     const content = $("dayContent");
     const tabs = $("dayTabs");
 
     if (!content || !tabs) return;
 
-    const itinerary = data.itinerary || data.answer || "";
-    const sections = extractDaySections(itinerary);
+    // Backend now returns:
+    // data.itinerary = {
+    //     title: "...",
+    //     summary: "...",
+    //     route: [...],
+    //     days: [...]
+    // }
 
-    tabs.innerHTML = "";
+    const itinerary = data.itinerary || {};
+
+    let days = Array.isArray(itinerary.days)
+        ? itinerary.days
+        : [];
 
     const totalDays = Math.max(
         1,
         Number(data.request?.days || currentTrip.days || 1)
     );
 
-    const days = [];
+    // Make sure we have exactly the requested number of days
+    const normalizedDays = [];
 
     for (let day = 1; day <= totalDays; day++) {
-        const found = sections.find(item => item.day === day);
 
-        days.push(
-            found || {
-                day,
-                title: "AI-planned day",
-                content: itinerary
+        const existingDay = days.find(
+            item => Number(item.day) === day
+        );
+
+        normalizedDays.push(
+            existingDay || {
+                day: day,
+                title: `Day ${day}`,
+                location: currentTrip.destination,
+                route: "",
+                activities: [],
+                day_budget: 0
             }
         );
     }
 
+    days = normalizedDays;
+
+    // Reset tabs
+    tabs.innerHTML = "";
+
+    // Make sure selected day is valid
+    if (
+        currentDay < 0 ||
+        currentDay >= days.length
+    ) {
+        currentDay = 0;
+    }
+
+    // =====================================================
+    // CREATE DAY BUTTONS
+    // =====================================================
+
     days.forEach((item, index) => {
+
         const button = document.createElement("button");
+
         button.type = "button";
+
         button.textContent =
             `Day ${String(item.day).padStart(2, "0")}`;
 
@@ -589,45 +624,225 @@ function renderItinerary(data) {
         }
 
         button.addEventListener("click", () => {
+
             currentDay = index;
 
             document
                 .querySelectorAll("#dayTabs button")
-                .forEach(tab => tab.classList.remove("selected"));
+                .forEach(tab => {
+                    tab.classList.remove("selected");
+                });
 
             button.classList.add("selected");
+
             renderSelectedDay(days);
         });
 
         tabs.appendChild(button);
     });
 
+    // Show selected day
     renderSelectedDay(days);
 
+
+    // =====================================================
+    // RENDER SELECTED DAY
+    // =====================================================
+
     function renderSelectedDay(allDays) {
-        const item = allDays[currentDay] || allDays[0];
+
+        const item =
+            allDays[currentDay] || allDays[0];
+
+        if (!item) {
+            content.innerHTML = `
+                <div class="empty-state">
+                    <h3>No itinerary available</h3>
+                </div>
+            `;
+
+            return;
+        }
+
+        const activities =
+            Array.isArray(item.activities)
+                ? item.activities
+                : [];
+
+
+        // =================================================
+        // ACTIVITIES
+        // =================================================
+
+        let activitiesHtml = "";
+
+        if (activities.length > 0) {
+
+            activitiesHtml = `
+                <div class="timeline">
+
+                    ${activities.map(activity => {
+
+                        const time =
+                            activity.time || "";
+
+                        const activityName =
+                            activity.activity || "Activity";
+
+                        const transport =
+                            activity.transport || "";
+
+                        const cost =
+                            Number(activity.estimated_cost);
+
+                        const currency =
+                            activity.currency ||
+                            currentTrip.currency ||
+                            "INR";
+
+                        const costText =
+                            Number.isFinite(cost) && cost > 0
+                                ? `${currency} ${cost.toLocaleString("en-IN")}`
+                                : "Included / Estimated";
+
+                        return `
+                            <div>
+
+                                <span class="timeline-dot"></span>
+
+                                <b>
+                                    ${escapeHtml(time)}
+                                </b>
+
+                                <section>
+
+                                    <strong>
+                                        ${escapeHtml(activityName)}
+                                    </strong>
+
+                                    ${
+                                        transport
+                                            ? `
+                                                <p>
+                                                    🚗
+                                                    ${escapeHtml(transport)}
+                                                </p>
+                                            `
+                                            : ""
+                                    }
+
+                                    <em>
+                                        ${escapeHtml(costText)}
+                                    </em>
+
+                                </section>
+
+                            </div>
+                        `;
+
+                    }).join("")}
+
+                </div>
+            `;
+
+        } else {
+
+            activitiesHtml = `
+                <div class="empty-state">
+                    <p>
+                        No activities were returned for this day.
+                    </p>
+                </div>
+            `;
+        }
+
+
+        // =================================================
+        // DAY BUDGET
+        // =================================================
+
+        let budgetHtml = "";
+
+        const dayBudget =
+            Number(item.day_budget);
+
+        if (
+            Number.isFinite(dayBudget) &&
+            dayBudget > 0
+        ) {
+
+            budgetHtml = `
+                <div class="day-budget">
+                    Estimated day budget:
+                    <strong>
+                        ${formatINR(dayBudget)}
+                    </strong>
+                </div>
+            `;
+        }
+
+
+        // =================================================
+        // LOCATION
+        // =================================================
+
+        const location =
+            item.location ||
+            currentTrip.destination;
+
+
+        // =================================================
+        // ROUTE
+        // =================================================
+
+        const route =
+            item.route ||
+            `${currentTrip.source} → ${location}`;
+
+
+        // =================================================
+        // FINAL HTML
+        // =================================================
 
         content.innerHTML = `
+
             <div class="day-title">
-                <span>${String(item.day).padStart(2, "0")}</span>
+
+                <span>
+                    ${String(item.day).padStart(2, "0")}
+                </span>
+
                 <div>
-                    <h3>${escapeHtml(item.title || "Travel day")}</h3>
+
+                    <h3>
+                        ${escapeHtml(
+                            item.title ||
+                            `Day ${item.day}`
+                        )}
+                    </h3>
+
                     <small>
-                        ${escapeHtml(currentTrip.source)}
-                        →
-                        ${escapeHtml(currentTrip.destination)}
+                        ${escapeHtml(location)}
                     </small>
+
                 </div>
+
             </div>
 
-            <div class="ai-response">
-                ${formatAIResponse(item.content)}
+
+            <div class="day-route">
+                ${escapeHtml(route)}
             </div>
+
+
+            ${activitiesHtml}
+
+
+            ${budgetHtml}
+
         `;
     }
 }
-
-
 function displayTravelResult(data) {
     currentResult = data;
 
