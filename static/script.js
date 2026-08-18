@@ -553,15 +553,34 @@ function renderItinerary(data) {
 
     if (!content || !tabs) return;
 
-    // Backend now returns:
-    // data.itinerary = {
-    //     title: "...",
-    //     summary: "...",
-    //     route: [...],
-    //     days: [...]
-    // }
+    // =====================================================
+    // NORMALIZE ITINERARY
+    // =====================================================
 
-    const itinerary = data.itinerary || {};
+    let itinerary = data?.itinerary || {};
+
+    // Handle the case where itinerary is returned as JSON text
+    if (typeof itinerary === "string") {
+        try {
+            itinerary = JSON.parse(itinerary);
+        } catch (error) {
+            console.warn(
+                "Unable to parse itinerary:",
+                error
+            );
+
+            itinerary = {};
+        }
+    }
+
+    // Make sure itinerary is an object
+    if (
+        !itinerary ||
+        typeof itinerary !== "object" ||
+        Array.isArray(itinerary)
+    ) {
+        itinerary = {};
+    }
 
     let days = Array.isArray(itinerary.days)
         ? itinerary.days
@@ -569,36 +588,85 @@ function renderItinerary(data) {
 
     const totalDays = Math.max(
         1,
-        Number(data.request?.days || currentTrip.days || 1)
+        Number(
+            data?.request?.days ||
+            currentTrip.days ||
+            days.length ||
+            1
+        )
     );
 
-    // Make sure we have exactly the requested number of days
+    // =====================================================
+    // NORMALIZE EACH DAY
+    // =====================================================
+
     const normalizedDays = [];
 
-    for (let day = 1; day <= totalDays; day++) {
+    for (
+        let dayNumber = 1;
+        dayNumber <= totalDays;
+        dayNumber++
+    ) {
 
         const existingDay = days.find(
-            item => Number(item.day) === day
+            item =>
+                item &&
+                Number(item.day) === dayNumber
         );
 
-        normalizedDays.push(
-            existingDay || {
-                day: day,
-                title: `Day ${day}`,
-                location: currentTrip.destination,
-                route: "",
-                activities: [],
-                day_budget: 0
-            }
-        );
+        const day = existingDay || {
+            day: dayNumber,
+            title: `Day ${dayNumber}`,
+            location:
+                currentTrip.destination || "",
+            route: "",
+            activities: [],
+            day_budget: 0
+        };
+
+        // Make sure activities is ALWAYS an array
+        const activities =
+            Array.isArray(day.activities)
+                ? day.activities
+                : [];
+
+        normalizedDays.push({
+            day: dayNumber,
+
+            title:
+                typeof day.title === "string"
+                    ? day.title
+                    : `Day ${dayNumber}`,
+
+            location:
+                typeof day.location === "string"
+                    ? day.location
+                    : currentTrip.destination || "",
+
+            route:
+                typeof day.route === "string"
+                    ? day.route
+                    : "",
+
+            activities,
+
+            day_budget:
+                Number.isFinite(
+                    Number(day.day_budget)
+                )
+                    ? Number(day.day_budget)
+                    : 0
+        });
     }
 
     days = normalizedDays;
 
-    // Reset tabs
+    // =====================================================
+    // RESET TABS
+    // =====================================================
+
     tabs.innerHTML = "";
 
-    // Make sure selected day is valid
     if (
         currentDay < 0 ||
         currentDay >= days.length
@@ -612,7 +680,8 @@ function renderItinerary(data) {
 
     days.forEach((item, index) => {
 
-        const button = document.createElement("button");
+        const button =
+            document.createElement("button");
 
         button.type = "button";
 
@@ -641,20 +710,21 @@ function renderItinerary(data) {
         tabs.appendChild(button);
     });
 
-    // Show selected day
-    renderSelectedDay(days);
-
-
     // =====================================================
     // RENDER SELECTED DAY
     // =====================================================
 
+    renderSelectedDay(days);
+
+
     function renderSelectedDay(allDays) {
 
         const item =
-            allDays[currentDay] || allDays[0];
+            allDays[currentDay] ||
+            allDays[0];
 
         if (!item) {
+
             content.innerHTML = `
                 <div class="empty-state">
                     <h3>No itinerary available</h3>
@@ -664,15 +734,14 @@ function renderItinerary(data) {
             return;
         }
 
+        // =================================================
+        // ACTIVITIES
+        // =================================================
+
         const activities =
             Array.isArray(item.activities)
                 ? item.activities
                 : [];
-
-
-        // =================================================
-        // ACTIVITIES
-        // =================================================
 
         let activitiesHtml = "";
 
@@ -684,24 +753,36 @@ function renderItinerary(data) {
                     ${activities.map(activity => {
 
                         const time =
-                            activity.time || "";
+                            typeof activity?.time === "string"
+                                ? activity.time
+                                : "";
 
                         const activityName =
-                            activity.activity || "Activity";
+                            typeof activity?.activity === "string"
+                                ? activity.activity
+                                : "Activity";
 
                         const transport =
-                            activity.transport || "";
+                            typeof activity?.transport === "string"
+                                ? activity.transport
+                                : "";
 
                         const cost =
-                            Number(activity.estimated_cost);
+                            Number(
+                                activity?.estimated_cost
+                            );
 
                         const currency =
-                            activity.currency ||
-                            currentTrip.currency ||
-                            "INR";
+                            typeof activity?.currency === "string"
+                                ? activity.currency
+                                : (
+                                    currentTrip.currency ||
+                                    "INR"
+                                );
 
                         const costText =
-                            Number.isFinite(cost) && cost > 0
+                            Number.isFinite(cost) &&
+                            cost > 0
                                 ? `${currency} ${cost.toLocaleString("en-IN")}`
                                 : "Included / Estimated";
 
@@ -717,7 +798,9 @@ function renderItinerary(data) {
                                 <section>
 
                                     <strong>
-                                        ${escapeHtml(activityName)}
+                                        ${escapeHtml(
+                                            activityName
+                                        )}
                                     </strong>
 
                                     ${
@@ -725,14 +808,18 @@ function renderItinerary(data) {
                                             ? `
                                                 <p>
                                                     🚗
-                                                    ${escapeHtml(transport)}
+                                                    ${escapeHtml(
+                                                        transport
+                                                    )}
                                                 </p>
                                             `
                                             : ""
                                     }
 
                                     <em>
-                                        ${escapeHtml(costText)}
+                                        ${escapeHtml(
+                                            costText
+                                        )}
                                     </em>
 
                                 </section>
@@ -755,7 +842,6 @@ function renderItinerary(data) {
                 </div>
             `;
         }
-
 
         // =================================================
         // DAY BUDGET
@@ -781,15 +867,14 @@ function renderItinerary(data) {
             `;
         }
 
-
         // =================================================
         // LOCATION
         // =================================================
 
         const location =
             item.location ||
-            currentTrip.destination;
-
+            currentTrip.destination ||
+            "";
 
         // =================================================
         // ROUTE
@@ -797,8 +882,12 @@ function renderItinerary(data) {
 
         const route =
             item.route ||
-            `${currentTrip.source} → ${location}`;
-
+            (
+                currentTrip.source &&
+                location
+                    ? `${currentTrip.source} → ${location}`
+                    : location
+            );
 
         // =================================================
         // FINAL HTML
@@ -829,14 +918,11 @@ function renderItinerary(data) {
 
             </div>
 
-
             <div class="day-route">
                 ${escapeHtml(route)}
             </div>
 
-
             ${activitiesHtml}
-
 
             ${budgetHtml}
 
