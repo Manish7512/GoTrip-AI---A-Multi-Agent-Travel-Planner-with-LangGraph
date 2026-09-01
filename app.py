@@ -9,7 +9,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, field_validator, model_validator
 
-from backend import run_travel_agent
+from backend import get_travel_state, run_travel_agent
+# # This is allow to nested event loops for async calls in FastAPI
+# import nest_asyncio
+# nest_asyncio.apply()
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -42,11 +45,9 @@ class TravelRequest(BaseModel):
         "style": "Balanced",
         "interests": "Food, culture, photography",
         "prompt": "",
+        "travel_date": "2026-09-15",
         "thread_id": "..."
     }
-
-    A legacy {message, thread_id} payload is also accepted so an old
-    cached browser script does not cause a 422 error.
     """
 
     source: str
@@ -57,6 +58,7 @@ class TravelRequest(BaseModel):
     style: str = "Balanced"
     interests: str = ""
     prompt: str = ""
+    travel_date: str | None = None
     thread_id: str | None = None
 
     @model_validator(mode="before")
@@ -192,11 +194,15 @@ async def home(request: Request):
 
 @app.post("/api/travel")
 async def travel_planner(request_data: TravelRequest):
+    
     payload = request_data.model_dump()
+    
     print("Received travel request:", payload)
 
     try:
-        result = run_travel_agent(**payload)
+        result = await run_travel_agent(
+            **payload
+        )
 
         return JSONResponse(
             content={
@@ -220,12 +226,23 @@ async def travel_planner(request_data: TravelRequest):
 
 @app.post("/api/chat")
 async def chat(request_data: dict):
+
     """
-    Chat/refinement endpoint. It preserves the current trip context.
+    Chat/refinement endpoint.
+    It preserves the current trip context.
     """
+
     try:
-        message = str(request_data.get("message", "")).strip()
+
+        message = str(
+            request_data.get(
+                "message",
+                ""
+            )
+        ).strip()
+
         if not message:
+
             return JSONResponse(
                 status_code=400,
                 content={
@@ -234,25 +251,79 @@ async def chat(request_data: dict):
                 },
             )
 
-        source = str(request_data.get("source", "")).strip()
-        destination = str(request_data.get("destination", "")).strip()
-        days = int(request_data.get("days", 1))
-        budget = float(request_data.get("budget", 1))
-        currency = str(request_data.get("currency", "INR"))
-        style = str(request_data.get("style", "Balanced"))
-        interests = str(request_data.get("interests", ""))
-        thread_id = request_data.get("thread_id")
+        thread_id = request_data.get(
+            "thread_id"
+        )
+
+        saved_state = {}
+
+        if thread_id:
+            saved_state = await get_travel_state(
+                str(thread_id)
+            )
+
+        source = str(
+            request_data.get("source")
+            or saved_state.get("source")
+            or ""
+        ).strip()
+
+        destination = str(
+            request_data.get("destination")
+            or saved_state.get("destination")
+            or ""
+        ).strip()
+
+        days = int(
+            request_data.get("days")
+            or saved_state.get("days")
+            or 1
+        )
+
+        budget = float(
+            request_data.get("budget")
+            or saved_state.get("budget")
+            or 1
+        )
+
+        currency = str(
+            request_data.get("currency")
+            or saved_state.get("currency")
+            or "INR"
+        )
+
+        style = str(
+            request_data.get("style")
+            or saved_state.get("style")
+            or "Balanced"
+        )
+
+        interests = str(
+            request_data.get("interests")
+            or saved_state.get("interests")
+            or ""
+        )
+
+        travel_date = (
+            request_data.get("travel_date")
+            or saved_state.get("travel_date")
+        )
 
         if not source or not destination:
+
             return JSONResponse(
                 status_code=400,
                 content={
                     "success": False,
-                    "error": "Source and destination are required for chat.",
+                    "error": (
+                        "Source and destination "
+                        "are required for chat unless "
+                        "thread_id points to a saved trip."
+                    ),
                 },
             )
 
-        result = run_travel_agent(
+        result = await run_travel_agent(
             source=source,
             destination=destination,
             days=days,
@@ -261,20 +332,29 @@ async def chat(request_data: dict):
             style=style,
             interests=interests,
             prompt=message,
+            travel_date=travel_date,
             thread_id=thread_id,
         )
 
         return {
             "success": True,
             "thread_id": result["thread_id"],
+            "final_answer": result["final_answer"],
             "answer": result["final_answer"],
             "route": result["route"],
             "score": result["score"],
             "request": result["request"],
+            "flight_results": result["flight_results"],
+            "hotel_results": result["hotel_results"],
+            "weather_results": result["weather_results"],
+            "itinerary": result["itinerary"],
+            "llm_calls": result["llm_calls"],
         }
 
     except Exception as exc:
+
         traceback.print_exc()
+
         return JSONResponse(
             status_code=500,
             content={
@@ -282,7 +362,6 @@ async def chat(request_data: dict):
                 "error": str(exc),
             },
         )
-
 
 @app.get("/health")
 async def health_check():

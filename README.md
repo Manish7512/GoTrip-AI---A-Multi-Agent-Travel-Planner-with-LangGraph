@@ -1,335 +1,171 @@
-# ✈️ GoTrip AI - A Multi-Agent Travel Planner with LangGraph
+# GoTrip AI - Multi-Agent Travel Planner
 
-**GoTrip AI** is a multi-agent AI travel planner built with **FastAPI, LangGraph, LangChain, Groq/Llama, PostgreSQL, and JavaScript**.
+GoTrip AI is a FastAPI + LangGraph travel planner that coordinates focused agents for route, flights, hotels, weather, itinerary generation, and final response formatting.
 
-It takes the user's **starting point, destination, duration, budget, travel style, interests, and optional instructions** and combines travel research with AI planning to create a personalized trip.
+It accepts a starting point, destination, date, duration, budget, travel style, interests, and optional prompt, then returns a grounded itinerary with supporting live travel data.
 
-## ✨ Features
+> Travel data, prices, weather, and AI-generated plans are planning suggestions. Verify details before booking.
 
-- ✈️ **Flight Research** using AviationStack API integration
-- 🏨 **Hotel Research** powered by Tavily web search
-- 🧠 **Multi-Agent Orchestration** with LangGraph stateful workflows
-- 📝 **AI Itinerary Generation** using Groq/Llama-powered planning
-- 🗺️ **Dynamic Route Planning** from source to destination
-- 💰 **Budget-Aware Recommendations** based on user-defined constraints
-- 🌐 **FastAPI REST API** for frontend-backend communication
-- 💾 **Persistent Trip State** using PostgreSQL and LangGraph checkpointing
-- 💬 **Context-Aware AI Chat** with thread-based conversation state
-- 🖥️ **Dynamic Frontend Rendering** using JavaScript and REST API responses
-
-> ⚠️ AI-generated routes, recommendations, estimated costs, and travel information are planning suggestions and should be verified before booking.
-
-## 🧠 How It Works
+## Architecture
 
 ```text
-User
-  ↓
-HTML + CSS + JavaScript
-  ↓
-POST /api/travel
-  ↓
-FastAPI
-  ↓
-LangGraph
-  ↓
-✈️ Flight Agent
-  ↓
-🏨 Hotel Agent
-  ↓
-✨ Itinerary Agent
-  │
-  └── 🗺️ Route Builder
-  ↓
-✓ Final Agent
-  ↓
-JSON Response
-  ↓
-Frontend
-  ↓
-Route + Itinerary + Budget + Results
-````
+USER INPUT
+  User travel request
+        |
+AI AGENTS
+  route_agent       -> Python deterministic route
+        |
+  flight_agent      -> Serp Flight MCP local server
+        |
+  hotel_agent       -> Tavily MCP remote server
+        |
+  weather_agent     -> Custom Weather MCP local server
+        |
+  itinerary_agent   -> Groq LLM structured planner
+        |
+  final_agent       -> Python Markdown formatter
+        |
+PERSISTENCE & STATE
+  PostgreSQL checkpointing
+  LangGraph shared TravelState
+```
 
-### Important
+External data-fetching agents call their data sources through MCP:
 
-The **Route Builder is not a separate agent**.
+- Flights: `serp_flight_mcp_server.py` using SerpAPI Google Flights.
+- Hotels: Tavily remote MCP via `mcp_client.py`.
+- Weather: `custom_weather_mcp_server.py` using OpenWeather.
 
-GoTrip AI currently has four AI agents:
+There is normally 1 LLM call per trip: structured itinerary generation in `itinerary_agent`.
+
+## Project Structure
 
 ```text
-✈️ Flight Agent
-🏨 Hotel Agent
-✨ Itinerary Agent
-✓ Final Agent
+app.py                         # FastAPI app and HTTP endpoints
+backend.py                     # LangGraph state, agents, graph, runner
+mcp_client.py                  # MultiServerMCPClient setup and tool helpers
+serp_flight_mcp_server.py      # Local SerpAPI Google Flights MCP server
+custom_weather_mcp_server.py   # Local OpenWeather MCP server
+templates/index.html           # UI
+static/script.js               # Frontend behavior and renderers
+static/style.css               # Frontend styles
+test_*.py                      # Import, graph, MCP, and integration smoke tests
 ```
 
-Route generation is handled inside the itinerary-planning workflow.
+## Environment
 
-## 🏗️ Architecture
-
-### Frontend
-
-```text
-templates/
-└── index.html       # Main application UI
-
-static/
-├── script.js        # API calls, form handling and UI logic
-└── style.css        # Application styling
-```
-
-The frontend collects the user's trip details, sends them to the FastAPI backend, and dynamically renders the returned results.
-
-### Backend
-
-```text
-app.py              # FastAPI application and API endpoints
-backend.py          # LangGraph workflow and AI agents
-
-tools/
-├── flight_tool.py  # Flight/transport search integration
-└── tavily_tool.py  # Web/search integration
-```
-
-## 🤖 AI Workflow
-
-```text
-START
-  ↓
-✈️ Flight Agent
-  ↓
-🏨 Hotel Agent
-  ↓
-✨ Itinerary Agent
-  │
-  └── 🗺️ Route Builder
-  ↓
-✓ Final Agent
-  ↓
-END
-```
-
-### ✈️ Flight Agent
-
-Searches for flight or transportation information based on the source, destination, duration, and trip requirements.
-
-### 🏨 Hotel Agent
-
-Uses web search to research accommodation options relevant to the destination, budget, and travel style.
-
-### 🗺️ Route Builder
-
-Generates a source-to-destination route that is used by the itinerary workflow and displayed in the frontend.
-
-The Route Builder is a **helper function, not a separate LangGraph agent**.
-
-### ✨ Itinerary Agent
-
-Combines the trip requirements, generated route, flight information, and hotel research to create a day-by-day travel plan.
-
-### ✓ Final Agent
-
-Combines the generated information into the final user-facing travel response.
-
-## 🔌 API
-
-### `GET /`
-
-Serves the main GoTrip AI web application.
-
-### `POST /api/travel`
-
-Main trip-planning endpoint.
-
-Example request:
-
-```json
-{
-  "source": "Delhi",
-  "destination": "Japan",
-  "days": 7,
-  "budget": 120000,
-  "currency": "INR",
-  "style": "Balanced",
-  "interests": "Food, culture",
-  "prompt": "",
-  "thread_id": null
-}
-```
-
-The response contains the generated travel plan and supporting information such as:
-
-- Final answer
-- Flight results
-- Hotel results
-- Route
-- Itinerary
-- AI score
-- LLM call information
-- Thread ID
-
-### `POST /api/chat`
-
-Allows the user to continue asking travel-related questions while retaining the existing trip context.
-
-### `GET /health`
-
-Checks whether the backend is running.
-
-```bash
-curl http://127.0.0.1:8000/health
-```
-
-## 📁 Project Structure
-
-```text
-GoTrip-AI/
-│
-├── app.py
-├── backend.py
-├── requirements.txt
-├── Dockerfile
-├── .dockerignore
-├── .gitignore
-│
-├── templates/
-│   └── index.html
-│
-├── static/
-│   ├── script.js
-│   └── style.css
-│
-├── tools/
-│   ├── flight_tool.py
-│   └── tavily_tool.py
-│
-└── test.py
-```
-
-## 🛠️ Technology Stack
-
-| Layer                  | Technology                        |
-| ---------------------- | --------------------------------- |
-| 🖥️ Frontend            | HTML, CSS, JavaScript             |
-| ⚡ Backend             | FastAPI                           |
-| 🚀 Server              | Uvicorn                           |
-| 🤖 Agent Orchestration | LangGraph                         |
-| 🔗 AI Framework        | LangChain                         |
-| 🧠 LLM                 | Groq / Llama                      |
-| ✈️ Flight Search       | AviationStack                     |
-| 🔎 Web Search          | Tavily                            |
-| 🗄️ Database            | PostgreSQL                        |
-| 💾 Checkpointing       | LangGraph PostgreSQL Checkpointer |
-| 🐳 Containerization    | Docker                            |
-
-## 🔐 Environment Variables
-
-Create a local `.env` file in the project root.
+Create `.env` in the project root:
 
 ```env
-GROQ_API_KEY=your_groq_api_key
-DATABASE_URL=your_postgresql_url
-TAVILY_API_KEY=your_tavily_api_key
+GROQ_API_KEY=
+SERPAPI_API_KEY=
+TAVILY_API_KEY=
+OPEN_WEATHER_API_KEY=
+DATABASE_URL=
+LANGSMITH_TRACING=
+LANGSMITH_ENDPOINT=
+LANGSMITH_API_KEY=
+LANGSMITH_PROJECT=
 ```
 
-Use the exact variable names required by the current tool implementations.
+`DATABASE_URL` is used by the LangGraph PostgreSQL checkpointer. `backend.py` appends `sslmode=require` when the URL does not already include an SSL mode.
 
-### Security
-
-Never commit real credentials to GitHub.
-
-Keep the following private:
-
-```text
-.env
-API keys
-Database credentials
-Access tokens
-```
-
-Recommended `.gitignore`:
-
-```gitignore
-.venv/
-venv/
-env/
-ENV/
-env.bak/
-venv.bak/
-__pycache__/
-*.py[cod]
-.env
-.env.*
-.DS_Store
-```
-
-If a real API key is accidentally pushed to GitHub, revoke or rotate it immediately.
-
-## 🚀 How to Run
-
-### 1. Clone the repository
-
-```bash
-git clone <your-repository-url>
-cd GoTrip-AI
-```
-
-### 2. Create a virtual environment
-
-macOS / Linux:
+## Run Locally
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-```
-
-Windows:
-
-```powershell
-.venv\Scripts\activate
-```
-
-### 3. Install dependencies
-
-```bash
 pip install --upgrade pip
 pip install -r requirements.txt
-```
-
-### 4. Configure environment variables
-
-Create `.env` in the project root and add the required API credentials.
-
-### 5. Start the application
-
-```bash
 python app.py
 ```
 
-Or:
-
-```bash
-uvicorn app:app --reload
-```
-
-### 6. Open the application
+Open:
 
 ```text
 http://127.0.0.1:8000
 ```
 
-The current project uses FastAPI to serve both the frontend and backend, so a separate frontend development server is not required.
+FastAPI serves both the backend API and frontend assets.
 
-## 🐳 Docker
+## API
 
-### Build the image
+### `GET /`
+
+Serves the web app.
+
+### `POST /api/travel`
+
+Example:
+
+```json
+{
+  "source": "Delhi",
+  "destination": "Dubai",
+  "days": 2,
+  "budget": 50000,
+  "currency": "INR",
+  "style": "Balanced",
+  "interests": "food, sightseeing",
+  "prompt": "Plan a practical 2-day Dubai trip.",
+  "travel_date": "2026-09-15",
+  "thread_id": "debug-test-trip"
+}
+```
+
+Response fields include:
+
+- `final_answer`
+- `flight_results`
+- `hotel_results`
+- `weather_results` (JSON text with `today_actual_weather` for current conditions and `per_day_forecast` daily trip-date entries; future dates outside OpenWeather's free 5-day forecast window are marked `forecast_unavailable_too_far_ahead`)
+- `itinerary`
+- `route`
+- `score`
+- `llm_calls`
+- `thread_id`
+
+### `POST /api/chat`
+
+Continues planning/refinement using the same trip context and thread ID.
+
+### `GET /health`
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+## Testing
+
+Cheap import smoke check:
+
+```bash
+python -c "import backend"
+```
+
+Graph/checkpointer tests require `DATABASE_URL`:
+
+```bash
+python test_graph.py
+python test_checkpointer.py
+python test_pool.py
+```
+
+MCP and end-to-end tests require valid API keys and network access:
+
+```bash
+python test.py
+python test_mcp_cache.py
+python test_serp_mcp.py
+python test_trip.py
+```
+
+`test_serp_mcp.py` confirms the Serp Flight MCP tools are registered and can perform a real trip flight search.
+
+## Docker
 
 ```bash
 docker build -t gotrip-ai .
-```
-
-### Run the container
-
-```bash
 docker run -p 8000:8000 gotrip-ai
 ```
 
@@ -339,175 +175,10 @@ Open:
 http://localhost:8000
 ```
 
-Inside the container, Uvicorn listens on:
+## Notes
 
-```text
-0.0.0.0:8000
-```
-
-Using `0.0.0.0` allows the application to accept connections from outside the container.
-
-## 🔧 Development Guide
-
-### 🎨 Frontend
-
-For UI changes, modify:
-
-```text
-templates/index.html
-static/script.js
-static/style.css
-```
-
-### ⚡ API
-
-For API or request/response changes, modify:
-
-```text
-app.py
-```
-
-### 🤖 AI Workflow
-
-For agents, LangGraph state, prompts, route generation, or workflow changes, modify:
-
-```text
-backend.py
-```
-
-### 🔌 External Integrations
-
-For flight or web-search integrations, modify:
-
-```text
-tools/
-```
-
-After backend changes, restart Uvicorn if necessary.
-
-For frontend changes, refresh the browser. If old JavaScript or CSS is cached, use:
-
-```text
-macOS: Cmd + Shift + R
-Windows/Linux: Ctrl + Shift + R
-```
-
-## 🧪 Testing
-
-The project includes:
-
-```text
-test.py
-```
-
-It can be used for basic testing of backend functionality and integrations.
-
-For API testing, tools such as Postman or the browser developer console can be used to inspect:
-
-```text
-POST /api/travel
-POST /api/chat
-GET /health
-```
-
-## 📊 Current Status
-
-GoTrip AI is an **active development project / prototype**.
-
-The core full-stack architecture is implemented:
-
-```text
-Frontend
-   ↓
-FastAPI
-   ↓
-LangGraph
-   ↓
-AI Agents
-   ↓
-External Search APIs
-   ↓
-PostgreSQL
-```
-
-The application can:
-
-- Collect structured trip requirements.
-- Search for travel information.
-- Generate routes.
-- Generate day-by-day itineraries.
-- Maintain trip state through thread IDs.
-- Return structured results to the frontend.
-- Display the generated route and itinerary.
-
-However, AI-generated travel plans, routes, recommendations, and estimated costs should be treated as **planning information rather than guaranteed booking information**.
-
-## ⚠️ Current Limitations
-
-- Flight and hotel information depends on the availability and accuracy of external APIs/search results.
-- AI-generated routes are not equivalent to navigation or map-routing services.
-- Estimated costs should be independently verified before booking.
-- API rate limits can affect response time or temporarily prevent LLM requests.
-- The current project is primarily designed as a development/prototype application rather than a complete booking platform.
-- Real booking confirmation is not currently handled directly by GoTrip AI.
-
-## 🔮 Future Improvements
-
-Possible future improvements include:
-
-- 🗺️ Interactive map integration
-- ✈️ Real-time flight availability
-- 🏨 Live hotel availability
-- 🎫 Activity and attraction booking
-- 🌦️ Weather-aware itinerary planning
-- 💱 Automatic currency conversion
-- 💰 Stronger budget-feasibility validation
-- 🧭 More accurate geographic route validation
-- 📄 PDF itinerary export
-- 👤 User authentication
-- 🗂️ Saved trip history
-- 📊 Production monitoring and logging
-- 🔁 Better API retry and rate-limit handling
-- 🔐 Production-grade security
-- ☁️ Cloud deployment
-
-## 💡 Why LangGraph?
-
-LangGraph allows GoTrip AI to divide travel planning into focused stages instead of asking a single LLM prompt to handle everything.
-
-Each agent has a specific responsibility while sharing a common travel state.
-
-This makes the application easier to:
-
-- 🧩 Understand
-- 🐛 Debug
-- 🔄 Extend
-- 📈 Scale
-- 🔗 Connect with additional tools
-
-Future agents or workflows could include:
-
-```text
-🌦️ Weather Agent
-🛂 Visa Agent
-🎫 Activity Agent
-💰 Budget Optimization Agent
-🚕 Local Transportation Agent
-🍽️ Restaurant Agent
-```
-
-## 🎯 Project Goal
-
-The goal of GoTrip AI is to make travel planning more convenient by bringing **travel research, AI reasoning, route generation, and itinerary planning** into a single application.
-
-Instead of manually researching multiple websites, users can provide their trip requirements and receive a structured starting point for planning their journey.
-
-## 👨‍💻 Project
-
-**GoTrip AI — Multi-Agent AI Travel Planner**
-
-Built with:
-
-**Python • FastAPI • LangGraph • LangChain • Groq • PostgreSQL • JavaScript**
-
-> ✈️ Plan smarter. 🗺️ Travel better. 🤖 Powered by AI.
+- GoTrip AI does not make bookings or guarantee availability.
+- Flight data comes from SerpAPI Google Flights through the local MCP server.
+- Hotel data comes from Tavily search results through MCP.
+- Weather data comes from OpenWeather through the local weather MCP server.
+- The frontend renders the structured data returned by the backend; no separate frontend dev server is required.

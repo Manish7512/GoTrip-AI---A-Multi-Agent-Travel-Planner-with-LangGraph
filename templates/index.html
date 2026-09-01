@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>GoTrip AI — Intelligent Travel Planner</title>
+    <title>GoTrip AI</title>
     <link
       rel="stylesheet"
-      href="{{ url_for('static', path='style.css') }}?v=3"
+      href="{{ url_for('static', path='style.css') }}?v=6"
     />
   </head>
 
@@ -35,8 +35,8 @@
     <main class="app-shell">
       <section class="hero">
         <div>
-          <div class="eyebrow"><i></i> AI TRAVEL WORKSPACE</div>
           <h1>Plan your perfect<br /><span>trip with AI.</span></h1>
+
           <p>
             Enter where you are starting from, where you want to go, your
             duration, budget and preferences. GoTrip uses those exact values to
@@ -48,7 +48,7 @@
           <span>✦</span>
           <div>
             <b>Multi-agent planning</b>
-            <small>Powered by LangGraph</small>
+            <small>Powered by LangGraph, MCP &amp; Guardrails</small>
           </div>
         </div>
       </section>
@@ -135,6 +135,13 @@
                   placeholder="120000 or 1.2 lakh"
                   autocomplete="off"
                 />
+              </div>
+            </div>
+
+            <div class="brief-row">
+              <div class="field">
+                <label for="travelDate">TRAVEL DATE</label>
+                <input id="travelDate" type="date" autocomplete="off" />
               </div>
             </div>
 
@@ -260,6 +267,66 @@
             </div>
           </div>
 
+          <!-- =====================================================
+              AI DATA RESULTS
+              Shows raw/structured outputs returned by backend.
+              ===================================================== -->
+          <div class="results-card" id="results">
+            <div class="card-heading">
+              <div>
+                <span class="card-label">LIVE TRAVEL DATA</span>
+                <h2>Trip intelligence</h2>
+              </div>
+            </div>
+
+            <div class="result-grid">
+              <section class="result-panel">
+                <div class="result-panel-head">
+                  <span class="result-icon flight">✈</span>
+                  <div>
+                    <b>Flights</b>
+                    <small>Transport information</small>
+                  </div>
+                </div>
+                <div id="flightResults" class="result-body">
+                  <div class="result-empty">
+                    Flight information will appear here.
+                  </div>
+                </div>
+              </section>
+
+              <section class="result-panel">
+                <div class="result-panel-head">
+                  <span class="result-icon hotel">⌂</span>
+                  <div>
+                    <b>Hotels</b>
+                    <small>Accommodation information</small>
+                  </div>
+                </div>
+                <div id="hotelResults" class="result-body">
+                  <div class="result-empty">
+                    Hotel information will appear here.
+                  </div>
+                </div>
+              </section>
+
+              <section class="result-panel weather-panel">
+                <div class="result-panel-head">
+                  <span class="result-icon weather">☁</span>
+                  <div>
+                    <b>Weather</b>
+                    <small>Forecast and conditions</small>
+                  </div>
+                </div>
+                <div id="weatherResults" class="result-body">
+                  <div class="result-empty">
+                    Weather information will appear here.
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+
           <div class="itinerary-card" id="itinerary">
             <div class="card-heading">
               <div>
@@ -354,6 +421,6 @@
 
     <div class="toast" id="toast"></div>
 
-    <script src="{{ url_for('static', path='script.js') }}?v=4"></script>
+    <script src="{{ url_for('static', path='script.js') }}?v=7"></script>
   </body>
 </html>
