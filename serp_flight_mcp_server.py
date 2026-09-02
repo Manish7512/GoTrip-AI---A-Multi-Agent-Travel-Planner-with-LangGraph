@@ -408,6 +408,7 @@ def search_trip_flights(
         )
 
     round_trip_error = None
+    outbound_from_round_trip = False
 
     try:
         initial = search_flights_serpapi(
@@ -433,6 +434,9 @@ def search_trip_flights(
         if isinstance(initial, dict)
         else []
     )
+
+    if outbound_best or outbound_other:
+        outbound_from_round_trip = True
 
     if not outbound_best and not outbound_other:
         try:
@@ -595,6 +599,50 @@ def search_trip_flights(
     )
 
     total_verified_price = None
+
+    # CRITICAL: Detect mixed pricing scenario
+    # If outbound came from round-trip search but return fell back to
+    # independent one-way search, the outbound_price already includes
+    # SerpAPI's estimated return cost. Summing it with an independent
+    # return price would double-count. Re-fetch outbound as genuine
+    # one-way to get a true component price.
+    if (
+        outbound_from_round_trip
+        and return_price_type == "one_way"
+        and outbound_price is not None
+        and return_price is not None
+    ):
+
+        try:
+            outbound_one_way_refetch = (
+                search_flights_serpapi(
+                    source_iata=source_iata,
+                    destination_iata=destination_iata,
+                    travel_date=travel_date,
+                    currency=currency,
+                    flight_type=2,
+                )
+            )
+
+            outbound_refetch_price = (
+                first_verified_price(
+                    outbound_one_way_refetch.get(
+                        "best_flights",
+                        []
+                    ) + outbound_one_way_refetch.get(
+                        "other_flights",
+                        []
+                    )
+                )
+            )
+
+            if outbound_refetch_price is not None:
+                outbound_price = outbound_refetch_price
+
+        except Exception:
+            # If re-fetch fails, proceed with original
+            # round-trip outbound price (may be inflated)
+            pass
 
     if (
         return_price is not None
