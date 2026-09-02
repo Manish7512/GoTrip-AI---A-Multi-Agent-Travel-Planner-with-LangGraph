@@ -2,7 +2,7 @@
 
 - [x] Known issue 1: `backend.py` `itinerary_agent()` relies on prompt text for outbound/return flight activities; Python validation only checks day/activity counts and never deterministically injects missing flight activities. Current refs: `backend.py:1788`, `backend.py:2353`, `backend.py:2374`, `backend.py:2392`.
 - [x] Known issue 2: verified flight budget total is inaccurate because `serp_flight_mcp_server.py` does not tag return-leg price semantics or expose a server-side total, while `backend.py` and `static/script.js` use first-match recursive price lookup. Current refs: `serp_flight_mcp_server.py:356`, `serp_flight_mcp_server.py:426`, `serp_flight_mcp_server.py:451`, `backend.py:3440`, `static/script.js:3269`.
-- [ ] Known issue 3: weather last-day date uses `max(days - 1, 0)` while flight and itinerary return dates use `max(days - 1, 1)`, so 1-day trip weather does not match the actual return date. Current refs: `backend.py:816`, `backend.py:1537`, `backend.py:1815`, `serp_flight_mcp_server.py:325`.
+- [x] Known issue 3: weather last-day date uses `max(days - 1, 0)` while flight and itinerary return dates use `max(days - 1, 1)`, so 1-day trip weather does not match the actual return date. Current refs: `backend.py:816`, `backend.py:1537`, `backend.py:1815`, `serp_flight_mcp_server.py:325`.
 - [ ] Known issue 4: broad/silent exception handling can hide real failures. Current refs: `backend.py:282`, `backend.py:408`, `backend.py:452`, `backend.py:470`, `backend.py:994`, `backend.py:3480`, `backend.py:3533`, `serp_flight_mcp_server.py:131`, `serp_flight_mcp_server.py:403`.
 - [ ] Known issue 5: frontend duplicates backend parsing/pricing logic and can drift; confirmed duplicate flight price resolver plus duplicated flight/hotel/weather response unwrapping. Current refs: `backend.py:382`, `backend.py:3431`, `static/script.js:941`, `static/script.js:991`, `static/script.js:1814`, `static/script.js:2890`, `static/script.js:3269`.
 - [ ] Additional issue 6: missing or invalid `travel_date` can crash `itinerary_agent()` before its guarded LLM block, even though `TravelRequest.travel_date` is optional and `flight_agent()` handles missing dates as unavailable. Current refs: `app.py:61`, `backend.py:765`, `backend.py:1810`.
@@ -13,14 +13,14 @@
 
 - Known issue 1: Added deterministic outbound/return flight activity construction and injection in `backend.py`, preserving flight activities when trimming days back to six activities. Commit: this fix commit.
 - Known issue 2: Added return-leg `price_type` and `total_verified_price` in `serp_flight_mcp_server.py`, then made backend markdown and frontend budget resolution prefer that value before old heuristic fallback. Commit: this fix commit.
+- Known issue 3: Added shared `trip_return_date()` helper in `backend.py` and used it for flight logging, weather `trip_end_date`, and itinerary return-date prompting. Commit: this fix commit.
 
 ## In progress
 
-- Known issue 3: shared trip return-date helper/date convention.
+- Known issue 4: broad/silent exception handling audit.
 
 ## Not started
 
-- Known issue 4: broad/silent exception handling audit.
 - Known issue 5: duplicated backend/frontend parsing and pricing notes.
 - Additional issue 6: optional/missing travel date crash in `itinerary_agent()`.
 - Additional issue 7: `REQUESTS_CA_BUNDLE` typo in `mcp_client.py`.

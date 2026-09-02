@@ -253,6 +253,22 @@ class Itinerary(BaseModel):
 # GENERAL HELPERS
 # ============================================================
 
+def trip_return_date(
+    travel_date: str,
+    days: int,
+):
+
+    start_date = datetime.strptime(
+        str(travel_date),
+        "%Y-%m-%d"
+    ).date()
+
+    return (
+        start_date
+        + timedelta(days=max(int(days) - 1, 1))
+    )
+
+
 def compact_text(
     value: Any,
     limit: int = 2000
@@ -1327,7 +1343,7 @@ async def flight_agent(
         }
 
     try:
-        departure_date = datetime.strptime(
+        datetime.strptime(
             travel_date,
             "%Y-%m-%d"
         ).date()
@@ -1355,9 +1371,9 @@ async def flight_agent(
         print(f"OUTBOUND DATE: {travel_date}")
         print(
             "RETURN DATE:",
-            (
-                departure_date
-                + timedelta(days=max(int(state["days"]) - 1, 1))
+            trip_return_date(
+                travel_date,
+                state["days"]
             ).isoformat()
         )
 
@@ -2078,9 +2094,9 @@ async def weather_agent(state: TravelState):
         for offset in range(days)
     ]
 
-    trip_end_date = (
-        start_date
-        + timedelta(days=max(days - 1, 0))
+    trip_end_date = trip_return_date(
+        travel_date,
+        days
     ).isoformat()
 
     try:
@@ -2352,11 +2368,10 @@ def itinerary_agent(
     )
 
     itinerary_return_date = (
-        datetime.strptime(
+        trip_return_date(
             state["travel_date"],
-            "%Y-%m-%d"
-        ).date()
-        + timedelta(days=max(days - 1, 1))
+            days
+        )
     ).isoformat()
 
     # --------------------------------------------------------
