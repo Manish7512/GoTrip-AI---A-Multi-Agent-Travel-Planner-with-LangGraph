@@ -8,6 +8,8 @@
 - [x] Additional issue 6: missing or invalid `travel_date` can crash `itinerary_agent()` before its guarded LLM block, even though `TravelRequest.travel_date` is optional and `flight_agent()` handles missing dates as unavailable. Current refs: `app.py:61`, `backend.py:765`, `backend.py:1810`.
 - [x] Additional issue 7: `mcp_client.py` sets `REQUEST_CA_BUNDLE` instead of `REQUESTS_CA_BUNDLE`, so requests-based MCP clients may not pick up the certifi CA bundle consistently. Current ref: `mcp_client.py:15`.
 - [x] Additional issue 8: `templates/index.html` has no weather agent row, but `static/script.js` animates and resets a `weather` agent, so weather work is invisible in the agent status panel. Current refs: `templates/index.html:187`, `static/script.js:613`, `static/script.js:633`.
+- [x] Issue A: Hotel cards display raw Tavily article titles (e.g., "Top Paris Luxury Hotel", "Ultimate Guide to Dubai Hotels") instead of extracted actual hotel names. Root cause: `final_agent()` was calling `add_hotel(title)` with the Tavily result title before extraction, and generic article titles passed the keyword filter. Current refs: `backend.py:3825-3829`.
+- [x] Issue B: Flight cost double-counting when outbound comes from round-trip search (includes estimated return) but return falls back to independent one-way search. Summing these prices double-counts the return leg. Current refs: `serp_flight_mcp_server.py:597-612`.
 
 ## Fixed
 
@@ -17,6 +19,8 @@
 - Known issue 4: Broad/silent exception handling reduced — backend.py and serp_flight_mcp_server.py narrow except clauses, add logging, and re-raise or return meaningful error values. Commit: 41d907c.
 - Additional issue 6: Defaulted travel_date to today in run_travel_agent() when None, so all downstream agents (itinerary_agent, weather_agent) receive valid dates. Commit: 2ac678a.
 - Known issue 5: Audited duplicated logic between backend (extract_json, flight price heuristic, hotel extraction) and frontend (parseMCPResponse, flight price resolution, hotel rendering). Confirmed three key duplications: (1) MCP response JSON unwrapping — backend simpler, frontend more defensive; (2) flight price recursion — logic twins, must stay in sync; (3) hotel filtering/display — server-side, low risk. Added detailed notes in CODEX_PROGRESS for next session. Commit: this commit.
+- Issue A: Removed `add_hotel(title)` call in `final_agent()` that was adding Tavily article titles directly. Now only uses `extract_hotel_names_from_text()` which requires strict regex patterns (markdown headings, category labels, explicit property names with hotel keywords in structured text, not just generic titles). Commit: c4483a6.
+- Issue B: Added tracking of whether outbound originated from round-trip search. When return falls back to one-way, re-fetches outbound with genuine one-way search (flight_type=2) to get true component price before summing with return price. This prevents double-counting the estimated return cost that was included in the original round-trip outbound price. Commit: af340d4.
 
 ## In progress
 
