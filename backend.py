@@ -379,6 +379,550 @@ def compact_flight_data(
     return text[:limit]
 
 
+def flight_options_from_leg(
+    leg_data: Any
+) -> list[dict]:
+
+    if not isinstance(
+        leg_data,
+        dict
+    ):
+
+        return []
+
+    options = []
+
+    for key in (
+        "best_flights",
+        "other_flights"
+    ):
+
+        values = leg_data.get(
+            key,
+            []
+        )
+
+        if isinstance(
+            values,
+            list
+        ):
+
+            options.extend(
+                item
+                for item in values
+                if isinstance(
+                    item,
+                    dict
+                )
+            )
+
+    return options
+
+
+def extract_hhmm(
+    value: Any
+) -> str:
+
+    text = str(
+        value or ""
+    ).strip()
+
+    match = re.search(
+        r"\b(\d{1,2}):(\d{2})\b",
+        text
+    )
+
+    if not match:
+        return ""
+
+    return (
+        f"{int(match.group(1)):02d}:"
+        f"{match.group(2)}"
+    )
+
+
+def flight_activity_time_minutes(
+    activity: dict
+) -> int | None:
+
+    time_text = str(
+        activity.get(
+            "time",
+            ""
+        )
+    )
+
+    match = re.search(
+        r"\b(\d{1,2}):(\d{2})\b",
+        time_text
+    )
+
+    if not match:
+        return None
+
+    hours = int(
+        match.group(1)
+    )
+
+    minutes = int(
+        match.group(2)
+    )
+
+    if (
+        hours > 23
+        or minutes > 59
+    ):
+
+        return None
+
+    return (
+        hours * 60
+        + minutes
+    )
+
+
+def activity_mentions_flight(
+    activity: Any
+) -> bool:
+
+    if not isinstance(
+        activity,
+        dict
+    ):
+
+        return False
+
+    text = " ".join(
+        str(
+            activity.get(
+                key,
+                ""
+            )
+        )
+        for key in (
+            "transport",
+            "activity"
+        )
+    )
+
+    return (
+        "flight"
+        in text.casefold()
+    )
+
+
+def activity_mentions_return_flight(
+    activity: Any,
+    source: str
+) -> bool:
+
+    if not activity_mentions_flight(
+        activity
+    ):
+
+        return False
+
+    text = " ".join(
+        str(
+            activity.get(
+                key,
+                ""
+            )
+        )
+        for key in (
+            "activity",
+            "transport"
+        )
+    ).casefold()
+
+    return any(
+        marker in text
+        for marker in (
+            "return",
+            "back",
+            "home",
+            source.casefold()
+        )
+    )
+
+
+def build_flight_activity(
+    leg_data: Any,
+    currency: str
+) -> dict:
+
+    options = flight_options_from_leg(
+        leg_data
+    )
+
+    selected = (
+        options[0]
+        if options
+        else None
+    )
+
+    if isinstance(
+        selected,
+        dict
+    ):
+
+        segments = selected.get(
+            "flights",
+            []
+        )
+
+        if isinstance(
+            segments,
+            list
+        ) and segments:
+
+            first_segment = (
+                segments[0]
+                if isinstance(
+                    segments[0],
+                    dict
+                )
+                else {}
+            )
+
+            last_segment = (
+                segments[-1]
+                if isinstance(
+                    segments[-1],
+                    dict
+                )
+                else first_segment
+            )
+
+            departure = (
+                first_segment.get(
+                    "departure_airport"
+                )
+                or {}
+            )
+
+            arrival = (
+                last_segment.get(
+                    "arrival_airport"
+                )
+                or {}
+            )
+
+            airline = str(
+                first_segment.get(
+                    "airline"
+                )
+                or ""
+            ).strip()
+
+            flight_number = str(
+                first_segment.get(
+                    "flight_number"
+                )
+                or ""
+            ).strip()
+
+            departure_time = extract_hhmm(
+                departure.get(
+                    "time"
+                )
+            )
+
+            pieces = [
+                item
+                for item in (
+                    airline,
+                    flight_number
+                )
+                if item
+            ]
+
+            activity_text = (
+                " ".join(pieces)
+                if pieces
+                else "Verified flight option"
+            )
+
+            dep_airport = (
+                departure.get("id")
+                or departure.get("name")
+            )
+
+            arr_airport = (
+                arrival.get("id")
+                or arrival.get("name")
+            )
+
+            if dep_airport and arr_airport:
+                activity_text += (
+                    f" from {dep_airport} "
+                    f"to {arr_airport}"
+                )
+
+            price = selected.get(
+                "price"
+            )
+
+            if not isinstance(
+                price,
+                (int, float)
+            ):
+
+                price = 0
+
+            return {
+                "time":
+                    departure_time,
+
+                "activity":
+                    activity_text,
+
+                "transport":
+                    "Flight",
+
+                "estimated_cost":
+                    float(price),
+
+                "currency":
+                    currency,
+            }
+
+    return {
+        "time": "",
+        "activity": "Flight information to be confirmed.",
+        "transport": "Flight",
+        "estimated_cost": 0,
+        "currency": currency,
+    }
+
+
+def trim_day_to_six_activities_preserving_flights(
+    day: dict
+) -> None:
+
+    activities = day.get(
+        "activities",
+        []
+    )
+
+    if not isinstance(
+        activities,
+        list
+    ):
+
+        day["activities"] = []
+        return
+
+    while len(activities) > 6:
+
+        removable_index = None
+
+        for index in range(
+            len(activities) - 1,
+            -1,
+            -1
+        ):
+
+            activity = activities[index]
+
+            if activity_mentions_flight(
+                activity
+            ):
+
+                continue
+
+            removable_index = index
+            break
+
+        if removable_index is None:
+            break
+
+        removed = activities.pop(
+            removable_index
+        )
+
+        print(
+            "Removed non-flight activity after "
+            "flight injection:",
+            removed.get("activity")
+            if isinstance(removed, dict)
+            else removed
+        )
+
+    day["activities"] = activities
+
+
+def ensure_required_flight_activities(
+    itinerary: dict,
+    flight_data: Any,
+    currency: str,
+    source: str,
+) -> None:
+
+    if not isinstance(
+        itinerary,
+        dict
+    ):
+
+        return
+
+    days = itinerary.get(
+        "days",
+        []
+    )
+
+    if not isinstance(
+        days,
+        list
+    ) or not days:
+
+        return
+
+    flight_data = (
+        flight_data
+        if isinstance(flight_data, dict)
+        else {}
+    )
+
+    outbound_data = (
+        flight_data.get("outbound")
+        or {}
+    )
+
+    return_data = (
+        flight_data.get("return")
+        or {}
+    )
+
+    first_day = days[0]
+
+    if isinstance(
+        first_day,
+        dict
+    ):
+
+        activities = first_day.get(
+            "activities",
+            []
+        )
+
+        if not isinstance(
+            activities,
+            list
+        ):
+
+            activities = []
+
+        if not any(
+            activity_mentions_flight(activity)
+            for activity in activities
+        ):
+
+            activities.insert(
+                0,
+                build_flight_activity(
+                    outbound_data,
+                    currency
+                )
+            )
+
+            first_day["activities"] = activities
+
+            trim_day_to_six_activities_preserving_flights(
+                first_day
+            )
+
+    final_day = days[-1]
+
+    if not isinstance(
+        final_day,
+        dict
+    ):
+
+        return
+
+    final_activities = final_day.get(
+        "activities",
+        []
+    )
+
+    if not isinstance(
+        final_activities,
+        list
+    ):
+
+        final_activities = []
+
+    if len(days) == 1:
+
+        has_return_flight = any(
+            activity_mentions_return_flight(
+                activity,
+                source
+            )
+            for activity in final_activities
+        )
+
+    else:
+
+        has_return_flight = any(
+            activity_mentions_flight(activity)
+            for activity in final_activities
+        )
+
+    if has_return_flight:
+        final_day["activities"] = final_activities
+        return
+
+    return_activity = build_flight_activity(
+        return_data,
+        currency
+    )
+
+    return_minutes = flight_activity_time_minutes(
+        return_activity
+    )
+
+    inserted = False
+
+    if return_minutes is not None:
+
+        for index, activity in enumerate(
+            final_activities
+        ):
+
+            activity_minutes = (
+                flight_activity_time_minutes(
+                    activity
+                )
+            )
+
+            if (
+                activity_minutes is not None
+                and return_minutes < activity_minutes
+            ):
+
+                final_activities.insert(
+                    index,
+                    return_activity
+                )
+
+                inserted = True
+                break
+
+    if not inserted:
+
+        final_activities.append(
+            return_activity
+        )
+
+    final_day["activities"] = final_activities
+
+    trim_day_to_six_activities_preserving_flights(
+        final_day
+    )
+
+
 def extract_json(
     value: Any
 ):
@@ -2396,6 +2940,31 @@ Return ONLY the structured Itinerary object.
                     f"{len(activities)} activities. "
                     f"At least 4 are required."
                 )
+
+        # ----------------------------------------------------
+        # REQUIRED FLIGHT ACTIVITIES
+        # ----------------------------------------------------
+        # Deterministically enforce the outbound and return
+        # flight activities without making another LLM call.
+        # ----------------------------------------------------
+
+        ensure_required_flight_activities(
+            itinerary=itinerary,
+            flight_data=extract_json(
+                state.get(
+                    "flight_results",
+                    ""
+                )
+            ),
+            currency=state.get(
+                "currency",
+                "INR"
+            ),
+            source=state.get(
+                "source",
+                ""
+            ),
+        )
 
         # ----------------------------------------------------
         # ROUTE MUST COME FROM PYTHON
