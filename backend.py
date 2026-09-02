@@ -3821,15 +3821,14 @@ def final_agent(
                     or ""
                 ).strip()
 
-                # First try the actual result title.
-                add_hotel(
-                    title,
-                    content,
-                    url
-                )
-
-                # Then extract hotel names embedded
-                # inside travel articles.
+                # Extract hotel names embedded inside travel articles.
+                # Do NOT add the Tavily article title directly—that often
+                # contains generic titles like "Top Paris Luxury Hotel" or
+                # "Ultimate Guide to Dubai Hotels", which are article headers,
+                # not actual hotel names. Only extract names that match strict
+                # patterns (markdown headings, category labels, explicit property
+                # names), which have hotel keywords embedded in the structured
+                # text, not just in a generic title.
                 extract_hotel_names_from_text(
                     content,
                     url
