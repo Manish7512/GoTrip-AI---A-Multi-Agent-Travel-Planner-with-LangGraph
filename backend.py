@@ -4675,6 +4675,14 @@ async def run_travel_agent(
             "Budget must be greater than zero."
         )
 
+    # Default travel_date to today if not provided
+
+    if travel_date is None:
+
+        travel_date = (
+            datetime.now().date().isoformat()
+        )
+
     # --------------------------------------------------------
     # THREAD
     # --------------------------------------------------------
