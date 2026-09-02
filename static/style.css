@@ -9,6 +9,7 @@
   --purple: #9785ff;
   --green: #5ce5a6;
   --orange: #ffb66c;
+  --blue: #5ab4ff;
 }
 
 * {
@@ -584,6 +585,11 @@ body:before {
 .agent-symbol.orange {
   color: var(--orange);
   background: rgba(255, 182, 108, 0.08);
+}
+
+.agent-symbol.blue {
+  color: var(--blue);
+  background: rgba(90, 180, 255, 0.08);
 }
 
 .agent-name {
