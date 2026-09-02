@@ -15,6 +15,7 @@
 - Known issue 2: Added return-leg `price_type` and `total_verified_price` in `serp_flight_mcp_server.py`, then made backend markdown and frontend budget resolution prefer that value before old heuristic fallback. Commit: this fix commit.
 - Known issue 3: Added shared `trip_return_date()` helper in `backend.py` and used it for flight logging, weather `trip_end_date`, and itinerary return-date prompting. Commit: this fix commit.
 - Known issue 4: Broad/silent exception handling reduced — backend.py and serp_flight_mcp_server.py narrow except clauses, add logging, and re-raise or return meaningful error values. Commit: 41d907c.
+- Additional issue 6: Defaulted travel_date to today in run_travel_agent() when None, so all downstream agents (itinerary_agent, weather_agent) receive valid dates. Commit: 2ac678a.
 
 ## In progress
 
@@ -23,7 +24,6 @@
 ## Not started
 
 - Known issue 5: duplicated backend/frontend parsing and pricing notes.
-- Additional issue 6: optional/missing travel date crash in `itinerary_agent()`.
 - Additional issue 7: `REQUESTS_CA_BUNDLE` typo in `mcp_client.py`.
 - Additional issue 8: missing weather agent row in `templates/index.html`.
 
