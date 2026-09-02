@@ -3266,7 +3266,7 @@ function renderBudget(data) {
      * Only use an explicitly supplied numeric
      * flight price. Never estimate one here.
      */
-    function findVerifiedFlightPrice(
+    function findHeuristicFlightPrice(
         value
     ) {
 
@@ -3283,7 +3283,7 @@ function renderBudget(data) {
             ) {
 
                 const result =
-                    findVerifiedFlightPrice(
+                    findHeuristicFlightPrice(
                         item
                     );
 
@@ -3373,7 +3373,7 @@ function renderBudget(data) {
         ) {
 
             const result =
-                findVerifiedFlightPrice(
+                findHeuristicFlightPrice(
                     nested
                 );
 
@@ -3388,8 +3388,36 @@ function renderBudget(data) {
         return null;
     }
 
+    function resolveVerifiedFlightPrice(
+        flightData
+    ) {
+
+        if (
+            flightData &&
+            typeof flightData === "object"
+        ) {
+
+            const total =
+                Number(
+                    flightData.total_verified_price
+                );
+
+            if (
+                Number.isFinite(total) &&
+                total >= 0
+            ) {
+
+                return total;
+            }
+        }
+
+        return findHeuristicFlightPrice(
+            flightData
+        );
+    }
+
     const verifiedFlightPrice =
-        findVerifiedFlightPrice(
+        resolveVerifiedFlightPrice(
             flightData
         );
 

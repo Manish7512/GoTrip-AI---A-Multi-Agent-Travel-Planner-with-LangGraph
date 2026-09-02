@@ -297,6 +297,56 @@ def search_google_flights(
     )
 
 
+def first_verified_price(
+    options: list
+) -> float | None:
+
+    for option in options:
+
+        if not isinstance(
+            option,
+            dict
+        ):
+
+            continue
+
+        raw = option.get(
+            "price"
+        )
+
+        if isinstance(
+            raw,
+            (int, float)
+        ) and raw >= 0:
+
+            return float(raw)
+
+        if isinstance(
+            raw,
+            str
+        ):
+
+            cleaned = (
+                raw
+                .replace(",", "")
+                .replace("₹", "")
+                .replace("$", "")
+                .strip()
+            )
+
+            try:
+                value = float(
+                    cleaned
+                )
+            except ValueError:
+                continue
+
+            if value >= 0:
+                return value
+
+    return None
+
+
 @mcp.tool()
 def search_trip_flights(
     source: str,
@@ -406,6 +456,7 @@ def search_trip_flights(
     return_best = []
     return_other = []
     return_error = None
+    return_price_type = None
 
     outbound_candidates = (
         outbound_best + outbound_other
@@ -445,6 +496,11 @@ def search_trip_flights(
                 []
             )
 
+            if return_best or return_other:
+                return_price_type = (
+                    "round_trip_total"
+                )
+
         except Exception as exc:
             return_error = str(exc)
 
@@ -467,6 +523,11 @@ def search_trip_flights(
                 "other_flights",
                 []
             )
+
+            if return_best or return_other:
+                return_price_type = (
+                    "one_way"
+                )
 
         except Exception as exc:
             if return_error:
@@ -506,6 +567,7 @@ def search_trip_flights(
             "destination_iata": source_iata,
         },
         "date": return_date,
+        "price_type": return_price_type,
         "best_flights": return_best[:5],
         "other_flights": return_other[:5],
     }
@@ -516,6 +578,34 @@ def search_trip_flights(
         + len(return_best)
         + len(return_other)
     )
+
+    outbound_price = first_verified_price(
+        outbound_best + outbound_other
+    )
+
+    return_price = first_verified_price(
+        return_best + return_other
+    )
+
+    total_verified_price = None
+
+    if (
+        return_price is not None
+        and return_price_type == "round_trip_total"
+    ):
+
+        total_verified_price = return_price
+
+    elif (
+        outbound_price is not None
+        and return_price is not None
+        and return_price_type == "one_way"
+    ):
+
+        total_verified_price = (
+            outbound_price
+            + return_price
+        )
 
     flight_result = {
         "status": (
@@ -533,6 +623,7 @@ def search_trip_flights(
         "return_date": return_date,
         "outbound": outbound,
         "return": returning,
+        "total_verified_price": total_verified_price,
         "result_count": total_count,
     }
 

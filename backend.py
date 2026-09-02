@@ -4004,9 +4004,7 @@ def final_agent(
         )
     )
 
-    verified_flight_price = None
-
-    def find_verified_flight_price(value):
+    def find_heuristic_flight_price(value):
         if value is None:
             return None
 
@@ -4050,12 +4048,13 @@ def final_agent(
                         TypeError,
                         ValueError
                     ):
+                        # Optional fare fields may be non-numeric labels.
                         pass
 
             # Search nested flight records.
             for nested in value.values():
 
-                result = find_verified_flight_price(
+                result = find_heuristic_flight_price(
                     nested
                 )
 
@@ -4066,7 +4065,7 @@ def final_agent(
 
             for item in value:
 
-                result = find_verified_flight_price(
+                result = find_heuristic_flight_price(
                     item
                 )
 
@@ -4075,11 +4074,33 @@ def final_agent(
 
         return None
 
-    verified_flight_price = (
-        find_verified_flight_price(
-            flight_data
+    verified_flight_price = None
+
+    if isinstance(
+        flight_data,
+        dict
+    ):
+
+        raw_total_verified_price = flight_data.get(
+            "total_verified_price"
         )
-    )
+
+        if isinstance(
+            raw_total_verified_price,
+            (int, float)
+        ) and raw_total_verified_price >= 0:
+
+            verified_flight_price = float(
+                raw_total_verified_price
+            )
+
+    if verified_flight_price is None:
+
+        verified_flight_price = (
+            find_heuristic_flight_price(
+                flight_data
+            )
+        )
 
     # --------------------------------------------------------
     # Calculate on-ground itinerary spending.
