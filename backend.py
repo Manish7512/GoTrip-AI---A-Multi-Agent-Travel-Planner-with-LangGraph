@@ -295,7 +295,12 @@ def compact_text(
             ensure_ascii=False
         )
 
-    except Exception:
+    except Exception as exc:
+
+        print(
+            "compact_text JSON serialization failed:",
+            exc
+        )
 
         text = str(value)
 
@@ -966,6 +971,7 @@ def extract_json(
         return json.loads(text)
 
     except Exception:
+        # Plain text MCP responses are expected to fail direct JSON parsing.
         pass
 
     # Try to extract JSON object/list from text.
@@ -1010,6 +1016,7 @@ def extract_json(
             )
 
         except Exception:
+            # Most candidate slices are intentionally invalid while probing.
             continue
 
     return None
@@ -1027,7 +1034,12 @@ def safe_json(
             ensure_ascii=False
         )[:limit]
 
-    except Exception:
+    except Exception as exc:
+
+        print(
+            "safe_json serialization failed:",
+            exc
+        )
 
         return str(value)[:limit]
 
@@ -1552,6 +1564,7 @@ Do not invent availability.
                     )
 
                 except Exception:
+                    # Tavily text wrappers may contain plain excerpts, not JSON.
                     pass
 
                 return
@@ -4139,6 +4152,7 @@ def final_agent(
             TypeError,
             ValueError
         ):
+            # Malformed day budgets should not prevent final summary rendering.
             pass
 
     parts.append(

@@ -130,7 +130,11 @@ def resolve_airport(
 
     try:
         local_airports = airportsdata.load("IATA")
-    except Exception:
+    except Exception as exc:
+        print(
+            "Airport data load failed:",
+            exc
+        )
         return None
 
     if (
@@ -450,8 +454,11 @@ def search_trip_flights(
                 []
             )
 
-        except Exception:
-            pass
+        except Exception as exc:
+            print(
+                "Outbound one-way fallback failed:",
+                exc
+            )
 
     return_best = []
     return_other = []
