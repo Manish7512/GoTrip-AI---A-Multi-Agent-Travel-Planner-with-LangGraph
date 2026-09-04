@@ -2958,10 +2958,6 @@ function renderHotelResults(value) {
         </div>
     `;
 }
-
-                                    </div>
-
-                                </div>
                             `;
                         }
                     )
