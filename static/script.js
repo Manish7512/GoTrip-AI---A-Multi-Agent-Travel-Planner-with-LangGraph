@@ -2957,7 +2957,7 @@ function renderHotelResults(value) {
 
         </div>
     `;
-}
+                            
                             `;
                         }
                     )
