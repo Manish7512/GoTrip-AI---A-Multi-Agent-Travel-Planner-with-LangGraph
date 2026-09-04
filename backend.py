@@ -168,6 +168,8 @@ class TravelState(TypedDict):
     hotel_results: str
 
     weather_results: str
+    
+    hotel_suggestions: str
 
     itinerary: dict
 
@@ -1383,6 +1385,50 @@ Do not invent prices.
 Do not invent availability.
 """.strip()
 
+    # --------------------------------------------------------
+    # Precompiled once (not rebuilt every loop iteration).
+    # --------------------------------------------------------
+
+    HEADING_PATTERN = re.compile(
+        r"(?:^|\s)#{2,6}\s*"
+        r"([A-Z][A-Za-z0-9&' .\-]{3,100}?)"
+        r"(?=\s+(?:Featured|Address|Price|Read|"
+        r"Hot List|Gold List|Check|"
+        r"Book|View)|\s*$)"
+    )
+
+    CATEGORY_PATTERN = re.compile(
+        r"(?:For\s+)?"
+        r"(?:luxury|honeymoon|wedding|"
+        r"safari|budget|mid[- ]range|"
+        r"boutique|affordable luxury|nicer)"
+        r"\s*:\s*"
+        r"([A-Z][A-Za-z0-9&' .\-]+?)"
+        r"(?=\s*(?:,|\.|;|\n|"
+        r"\s+Featured|\s+Read|\s+Check))",
+        flags=re.IGNORECASE
+    )
+
+    CLICK_PATTERN = re.compile(
+        r"(?:Click to Book|Book)\s+"
+        r"(?:the\s+)?"
+        r"([A-Z][A-Za-z0-9&' .\-]{3,100}?)"
+        r"(?=\s*(?:\.|,|;|\n|$))",
+        flags=re.IGNORECASE
+    )
+
+    EXPLICIT_PROPERTY_PATTERN = re.compile(
+        r"\b("
+        r"[A-Z][A-Za-z0-9&' .\-]{2,90}"
+        r"(?:Hotel|Resort|Inn|Suites|"
+        r"Rotana|Residence|Residences|"
+        r"Apartments|Hostel|Palace|"
+        r"Lodge|Villa|Villas|Retreat|"
+        r"Manor|Beach Resort)"
+        r"(?:\s*&\s*[A-Za-z][A-Za-z0-9&' .\-]*)?"
+        r")"
+    )
+
     try:
 
         result = await tavily_mcp_search(
@@ -1462,6 +1508,8 @@ Do not invent availability.
         collect_results(
             result
         )
+
+        print(f"\nHOTEL_RESULTS COUNT: {len(hotel_results)}")
 
         # ====================================================
         # HOTEL NAME EXTRACTION
@@ -1713,9 +1761,14 @@ Do not invent availability.
 
         # ====================================================
         # EXTRACT FROM EACH TAVILY ARTICLE
+        #
+        # Each item is processed independently so one
+        # malformed item can never abort the whole loop.
         # ====================================================
 
-        for item in hotel_results:
+        item_errors = 0
+
+        for idx, item in enumerate(hotel_results):
 
             if not isinstance(
                 item,
@@ -1723,139 +1776,51 @@ Do not invent availability.
             ):
                 continue
 
-            title = str(
-                item.get("title")
-                or item.get("name")
-                or ""
-            ).strip()
+            try:
 
-            content = str(
-                item.get("content")
-                or item.get("description")
-                or ""
-            ).strip()
+                title = str(
+                    item.get("title")
+                    or item.get("name")
+                    or ""
+                ).strip()
 
-            source_text = (
-                f"{title}\n{content}"
-            )
+                content = str(
+                    item.get("content")
+                    or item.get("description")
+                    or ""
+                ).strip()
 
-            # ------------------------------------------------
-            # 1. Markdown headings
-            #
-            # ### The Oberoi, Mumbai
-            # ### SUJÁN Sher Bagh
-            # ### Samode Palace
-            # ------------------------------------------------
-
-            heading_pattern = (
-                r"(?:^|\s)#{2,6}\s*"
-                r"([A-Z][A-Za-z0-9&' .\-]{3,100}?)"
-                r"(?=\s+(?:Featured|Address|Price|Read|"
-                r"Hot List|Gold List|Check|"
-                r"Book|View)|\s*$)"
-            )
-
-            for match in re.findall(
-                heading_pattern,
-                source_text
-            ):
-
-                candidate = (
-                    match
-                    .strip()
+                source_text = (
+                    f"{title}\n{content}"
                 )
 
-                save_hotel(
-                    candidate,
-                    item
+                for match in HEADING_PATTERN.findall(source_text):
+                    save_hotel(match.strip(), item)
+
+                for match in CATEGORY_PATTERN.findall(source_text):
+                    save_hotel(match.strip(), item)
+
+                for match in CLICK_PATTERN.findall(source_text):
+                    save_hotel(match, item)
+
+                for match in EXPLICIT_PROPERTY_PATTERN.findall(source_text):
+                    save_hotel(match, item)
+
+            except Exception as item_exc:
+
+                item_errors += 1
+
+                print(
+                    f"Hotel item {idx} extraction error:",
+                    repr(item_exc)
                 )
 
-            # ------------------------------------------------
-            # 2. Category-based recommendations
-            #
-            # For luxury: The Oberoi, Mumbai
-            # For a honeymoon: The Oberoi Amarvilas, Agra
-            # For a wedding: Fairmont Udaipur Palace, Rajasthan
-            # ------------------------------------------------
+                continue
 
-            category_pattern = (
-                r"(?:For\s+)?"
-                r"(?:luxury|honeymoon|wedding|"
-                r"safari|budget|mid[- ]range|"
-                r"boutique|affordable luxury|nicer)"
-                r"\s*:\s*"
-                r"([A-Z][A-Za-z0-9&' .\-]+?)"
-                r"(?=\s*(?:,|\.|;|\n|"
-                r"\s+Featured|\s+Read|\s+Check))"
-            )
-
-            for match in re.findall(
-                category_pattern,
-                source_text,
-                flags=re.IGNORECASE
-            ):
-
-                candidate = (
-                    match
-                    .strip()
-                )
-
-                save_hotel(
-                    candidate,
-                    item
-                )
-
-            # ------------------------------------------------
-            # 3. "Click to Book ..."
-            # ------------------------------------------------
-
-            click_pattern = (
-                r"(?:Click to Book|Book)\s+"
-                r"(?:the\s+)?"
-                r"([A-Z][A-Za-z0-9&' .\-]{3,100}?)"
-                r"(?=\s*(?:\.|,|;|\n|$))"
-            )
-
-            for match in re.findall(
-                click_pattern,
-                source_text,
-                flags=re.IGNORECASE
-            ):
-
-                save_hotel(
-                    match,
-                    item
-                )
-
-            # ------------------------------------------------
-            # 4. Explicit property names
-            #
-            # The Westin Dubai Mina Seyahi Beach Resort
-            # Al Bandar Rotana Dubai Creek
-            # Royal Orchid Beach Resort & Spa
-            # ------------------------------------------------
-
-            explicit_property_pattern = (
-                r"\b("
-                r"[A-Z][A-Za-z0-9&' .\-]{2,90}"
-                r"(?:Hotel|Resort|Inn|Suites|"
-                r"Rotana|Residence|Residences|"
-                r"Apartments|Hostel|Palace|"
-                r"Lodge|Villa|Villas|Retreat|"
-                r"Manor|Beach Resort)"
-                r"(?:\s*&\s*[A-Za-z][A-Za-z0-9&' .\-]*)?"
-                r")"
-            )
-
-            for match in re.findall(
-                explicit_property_pattern,
-                source_text
-            ):
-
-                save_hotel(
-                    match,
-                    item
-                )
+        print(
+            f"HOTEL EXTRACTION: {len(extracted_hotels)} accepted, "
+            f"{item_errors} item errors, {len(hotel_results)} items scanned"
+        )
 
         # ====================================================
         # FALLBACK
@@ -1882,9 +1847,12 @@ Do not invent availability.
 
     except Exception as exc:
 
+        import traceback
+        traceback.print_exc()
+
         print(
             "Hotel Agent Error:",
-            exc
+            repr(exc)
         )
 
         hotel_data = {

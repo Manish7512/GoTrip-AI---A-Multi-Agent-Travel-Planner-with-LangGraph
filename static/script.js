@@ -436,6 +436,11 @@ async function callTravelBackend(trip) {
     const payload =
         buildPayload(trip);
 
+    console.log(
+        "GoTrip API request:",
+        payload
+    );
+
     const response =
         await fetch(
             "/api/travel",
@@ -470,6 +475,11 @@ async function callTravelBackend(trip) {
             "Server returned an invalid JSON response."
         );
     }
+
+    console.log(
+        "GoTrip API response:",
+        data
+    );
 
     if (
         !response.ok ||
@@ -1994,6 +2004,11 @@ function normalizeFlightData(value) {
             parsed ?? value
         );
 
+    console.log(
+        "[GoTrip] normalized flight data:",
+        result
+    );
+
     return result;
 }
 
@@ -2015,6 +2030,16 @@ function renderFlightResults(value) {
         normalizeFlightData(
             value
         );
+
+    console.log(
+        "[GoTrip] renderFlightResults input:",
+        value
+    );
+
+    console.log(
+        "[GoTrip] renderFlightResults normalized:",
+        flight
+    );
 
     if (
         !flight ||
@@ -2859,6 +2884,141 @@ function renderFlightResults(value) {
 
 
 /* ============================================================
+   HOTEL NORMALIZER
+   ============================================================ */
+
+function normalizeHotelData(value) {
+
+    const data =
+        parseMCPResponse(
+            value
+        );
+
+    if (!data) {
+        return [];
+    }
+
+    function collect(value) {
+
+        if (!value) {
+            return [];
+        }
+
+        if (Array.isArray(value)) {
+
+            let results = [];
+
+            for (const item of value) {
+
+                results.push(
+                    ...collect(item)
+                );
+            }
+
+            return results;
+        }
+
+        if (typeof value === "string") {
+
+            return collect(
+                parseMCPResponse(
+                    value
+                )
+            );
+        }
+
+        if (
+            typeof value !== "object"
+        ) {
+
+            return [];
+        }
+
+        if (
+            Array.isArray(value.results)
+        ) {
+
+            return collect(
+                value.results
+            );
+        }
+
+        if (
+            typeof value.text === "string"
+        ) {
+
+            return collect(
+                value.text
+            );
+        }
+
+        if (
+            value.title ||
+            value.name ||
+            value.url
+        ) {
+
+            return [
+                value
+            ];
+        }
+
+        let results = [];
+
+        for (
+            const nested of
+            Object.values(value)
+        ) {
+
+            results.push(
+                ...collect(nested)
+            );
+        }
+
+        return results;
+    }
+
+    const hotels =
+        collect(
+            data
+        );
+
+    const seen =
+        new Set();
+
+    return hotels.filter(
+        hotel => {
+
+            const title =
+                hotel?.title ||
+                hotel?.name ||
+                hotel?.url ||
+                "";
+
+            const key =
+                String(title)
+                    .trim()
+                    .toLowerCase();
+
+            if (
+                !key ||
+                seen.has(key)
+            ) {
+
+                return false;
+            }
+
+            seen.add(
+                key
+            );
+
+            return true;
+        }
+    );
+}
+
+
+/* ============================================================
    HOTEL RENDERER
    ============================================================ */
 
@@ -2871,21 +3031,74 @@ function renderHotelResults(value) {
         return;
     }
 
-    // Parse hotel_suggestions (cleaned names from backend extraction)
+    console.log(
+        "[GoTrip] Hotel suggestions received:",
+        value
+    );
+
+    /*
+     * Backend normally sends hotel_suggestions
+     * as a JSON string containing cleaned hotel objects.
+     */
     let hotels = [];
-    
-    if (typeof value === "string" && value.trim()) {
+
+    if (
+        typeof value === "string" &&
+        value.trim()
+    ) {
+
         try {
-            const parsed = JSON.parse(value);
-            if (Array.isArray(parsed)) {
-                hotels = parsed;
+
+            const parsed =
+                JSON.parse(
+                    value
+                );
+
+            if (
+                Array.isArray(parsed)
+            ) {
+
+                hotels =
+                    parsed;
             }
-        } catch (e) {
-            console.warn("Could not parse hotel_suggestions JSON:", e);
+
+        } catch (error) {
+
+            console.warn(
+                "[GoTrip] Could not parse hotel_suggestions JSON:",
+                error
+            );
         }
     }
 
+    /*
+     * Also support an already-parsed array.
+     */
+    else if (
+        Array.isArray(value)
+    ) {
+
+        hotels =
+            value;
+    }
+
+    /*
+     * If the backend returns an object instead,
+     * try the normalizer.
+     */
+    else if (
+        value &&
+        typeof value === "object"
+    ) {
+
+        hotels =
+            normalizeHotelData(
+                value
+            );
+    }
+
     if (
+        !Array.isArray(hotels) ||
         !hotels.length
     ) {
 
@@ -2898,6 +3111,9 @@ function renderHotelResults(value) {
         return;
     }
 
+    /*
+     * Display at most 8 hotels.
+     */
     const visibleHotels =
         hotels.slice(
             0,
@@ -2914,6 +3130,7 @@ function renderHotelResults(value) {
 
                             const name =
                                 hotel?.name ||
+                                hotel?.title ||
                                 "Hotel suggestion";
 
                             const url =
@@ -2957,17 +3174,7 @@ function renderHotelResults(value) {
 
         </div>
     `;
-                            
-                            `;
-                        }
-                    )
-                    .join("")
-            }
-
-        </div>
-    `;
 }
-
 
 /* ============================================================
    BUDGET
@@ -3885,6 +4092,11 @@ COMPLETE BACKEND RESULT
 
 function renderAllBackendResults(data) {
 
+    console.log(
+        "[GoTrip] Rendering backend results:",
+        data
+    );
+
     const renderers = [
 
         [
@@ -3950,6 +4162,10 @@ function renderAllBackendResults(data) {
 
             renderer();
 
+            console.log(
+                `[GoTrip] ${name} renderer OK`
+            );
+
         } catch (error) {
 
             console.error(
@@ -3965,6 +4181,49 @@ function displayTravelResult(data) {
 
     currentResult =
         data;
+
+    console.log(
+        "========== GOTRIP RESULT =========="
+    );
+
+    console.log(
+        "FULL RESPONSE:",
+        data
+    );
+
+    console.log(
+        "REQUEST:",
+        data?.request
+    );
+
+    console.log(
+        "FLIGHTS:",
+        data?.flight_results
+    );
+
+    console.log(
+        "HOTELS:",
+        data?.hotel_results
+    );
+
+    console.log(
+        "WEATHER:",
+        data?.weather_results
+    );
+
+    console.log(
+        "ITINERARY:",
+        data?.itinerary
+    );
+
+    console.log(
+        "FINAL ANSWER:",
+        data?.final_answer
+    );
+
+    console.log(
+        "===================================="
+    );
 
     /*
      * Synchronize request data from backend.
@@ -4034,6 +4293,9 @@ function displayTravelResult(data) {
     currentDay =
         0;
 
+    console.log(
+        "[GoTrip] All backend results rendered."
+    );
 }
 
 
@@ -4946,6 +5208,9 @@ function initialize() {
         null
     );
 
+    console.log(
+        "GoTrip AI frontend initialized."
+    );
 }
 
 
