@@ -166,10 +166,11 @@ class TravelState(TypedDict):
     flight_results: str
 
     hotel_results: str
-
-    weather_results: str
     
     hotel_suggestions: str
+    
+    weather_results: str
+
 
     itinerary: dict
 
@@ -4167,8 +4168,11 @@ def final_agent(
             if name:
                 hotel_suggestions.append({
                     "name": name,
+                    "content": str(
+                        hotel.get("content", "")
+                        ).strip()[:500],
                     "url": url or ""
-                })
+                    })
 
     return {
 

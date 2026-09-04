@@ -2898,17 +2898,23 @@ function normalizeHotelData(value) {
         return [];
     }
 
-    function collect(value) {
+    function collect(
+        value
+    ) {
 
         if (!value) {
             return [];
         }
 
-        if (Array.isArray(value)) {
+        if (
+            Array.isArray(value)
+        ) {
 
             let results = [];
 
-            for (const item of value) {
+            for (
+                const item of value
+            ) {
 
                 results.push(
                     ...collect(item)
@@ -2918,7 +2924,10 @@ function normalizeHotelData(value) {
             return results;
         }
 
-        if (typeof value === "string") {
+        if (
+            typeof value ===
+            "string"
+        ) {
 
             return collect(
                 parseMCPResponse(
@@ -2928,14 +2937,17 @@ function normalizeHotelData(value) {
         }
 
         if (
-            typeof value !== "object"
+            typeof value !==
+            "object"
         ) {
 
             return [];
         }
 
         if (
-            Array.isArray(value.results)
+            Array.isArray(
+                value.results
+            )
         ) {
 
             return collect(
@@ -2944,7 +2956,8 @@ function normalizeHotelData(value) {
         }
 
         if (
-            typeof value.text === "string"
+            typeof value.text ===
+            "string"
         ) {
 
             return collect(
@@ -2971,7 +2984,9 @@ function normalizeHotelData(value) {
         ) {
 
             results.push(
-                ...collect(nested)
+                ...collect(
+                    nested
+                )
             );
         }
 
@@ -2996,7 +3011,9 @@ function normalizeHotelData(value) {
                 "";
 
             const key =
-                String(title)
+                String(
+                    title
+                )
                     .trim()
                     .toLowerCase();
 
@@ -3022,7 +3039,7 @@ function normalizeHotelData(value) {
    HOTEL RENDERER
    ============================================================ */
 
-function renderHotelResults(value) {
+function renderHotelResults(value, rawValue = null) {
 
     const element =
         $("hotelResults");
@@ -3032,88 +3049,34 @@ function renderHotelResults(value) {
     }
 
     console.log(
-        "[GoTrip] Hotel suggestions received:",
+        "[GoTrip] Rendering hotel results:",
         value
     );
 
     /*
-     * Backend normally sends hotel_suggestions
-     * as a JSON string containing cleaned hotel objects.
+     * hotel_suggestions is the preferred, cleaned backend payload.
+     * normalizeHotelData() also understands raw MCP/Tavily responses,
+     * so use hotel_results as a safe fallback when suggestions are empty.
      */
-    let hotels = [];
+    let hotels =
+        normalizeHotelData(value);
 
-    if (
-        typeof value === "string" &&
-        value.trim()
-    ) {
-
-        try {
-
-            const parsed =
-                JSON.parse(
-                    value
-                );
-
-            if (
-                Array.isArray(parsed)
-            ) {
-
-                hotels =
-                    parsed;
-            }
-
-        } catch (error) {
-
-            console.warn(
-                "[GoTrip] Could not parse hotel_suggestions JSON:",
-                error
-            );
-        }
-    }
-
-    /*
-     * Also support an already-parsed array.
-     */
-    else if (
-        Array.isArray(value)
-    ) {
-
+    if (!hotels.length && rawValue) {
         hotels =
-            value;
+            normalizeHotelData(rawValue);
     }
 
-    /*
-     * If the backend returns an object instead,
-     * try the normalizer.
-     */
-    else if (
-        value &&
-        typeof value === "object"
-    ) {
-
-        hotels =
-            normalizeHotelData(
-                value
-            );
-    }
-
-    if (
-        !Array.isArray(hotels) ||
-        !hotels.length
-    ) {
+    if (!hotels.length) {
 
         element.innerHTML = `
             <div class="result-empty">
-                No hotel suggestions were extracted.
+                No hotel suggestions were found.
             </div>
         `;
 
         return;
     }
 
-    /*
-     * Display at most 8 hotels.
-     */
     const visibleHotels =
         hotels.slice(
             0,
@@ -3133,8 +3096,15 @@ function renderHotelResults(value) {
                                 hotel?.title ||
                                 "Hotel suggestion";
 
+                            const content =
+                                hotel?.content ||
+                                hotel?.description ||
+                                hotel?.snippet ||
+                                "";
+
                             const url =
                                 hotel?.url ||
+                                hotel?.link ||
                                 "";
 
                             return `
@@ -3147,6 +3117,20 @@ function renderHotelResults(value) {
                                                 name
                                             )}
                                         </h3>
+
+                                        ${
+                                            content
+                                                ? `
+                                                    <p class="hotel-description">
+                                                        ${escapeHtml(
+                                                            String(
+                                                                content
+                                                            ).trim()
+                                                        )}
+                                                    </p>
+                                                `
+                                                : ""
+                                        }
 
                                         ${
                                             url
@@ -3163,6 +3147,7 @@ function renderHotelResults(value) {
                                                 `
                                                 : ""
                                         }
+
                                     </div>
 
                                 </div>
@@ -4111,7 +4096,8 @@ function renderAllBackendResults(data) {
             "hotels",
             () =>
                 renderHotelResults(
-                    data?.hotel_suggestions
+                    data?.hotel_suggestions,
+                    data?.hotel_results
                 )
         ],
 
@@ -4763,7 +4749,8 @@ async function sendChatMessage() {
         );
 
         renderHotelResults(
-            data?.hotel_suggestions
+            data?.hotel_suggestions,
+            data?.hotel_results
         );
 
         renderWeatherResults(
