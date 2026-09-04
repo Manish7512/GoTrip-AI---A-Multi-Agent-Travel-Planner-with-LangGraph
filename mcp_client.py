@@ -204,39 +204,3 @@ async def weather_mcp_call(
         tool_args or {}
     )
 
-
-# ============================================================
-# EXPLICIT INITIALIZATION
-# ============================================================
-
-async def initialize_mcp():
-
-    await get_all_tools()
-
-    print("MCP INITIALIZATION OK")
-
-
-async def initialize_weather_tools():
-
-    tools = await get_all_tools()
-
-    required = {
-        "get_current_weather",
-        "get_forecast",
-    }
-
-    available = {
-        tool.name
-        for tool in tools
-    }
-
-    missing = required - available
-
-    if missing:
-
-        raise RuntimeError(
-            "Weather MCP tools missing: "
-            + ", ".join(sorted(missing))
-        )
-
-    print("WEATHER MCP TOOLS OK")

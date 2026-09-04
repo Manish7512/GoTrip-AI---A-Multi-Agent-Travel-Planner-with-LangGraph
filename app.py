@@ -196,8 +196,6 @@ async def home(request: Request):
 async def travel_planner(request_data: TravelRequest):
     
     payload = request_data.model_dump()
-    
-    print("Received travel request:", payload)
 
     try:
         result = await run_travel_agent(
@@ -346,6 +344,7 @@ async def chat(request_data: dict):
             "request": result["request"],
             "flight_results": result["flight_results"],
             "hotel_results": result["hotel_results"],
+            "hotel_suggestions": result["hotel_suggestions"],
             "weather_results": result["weather_results"],
             "itinerary": result["itinerary"],
             "llm_calls": result["llm_calls"],

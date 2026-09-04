@@ -758,16 +758,8 @@ def trim_day_to_six_activities_preserving_flights(
         if removable_index is None:
             break
 
-        removed = activities.pop(
+        activities.pop(
             removable_index
-        )
-
-        print(
-            "Removed non-flight activity after "
-            "flight injection:",
-            removed.get("activity")
-            if isinstance(removed, dict)
-            else removed
         )
 
     day["activities"] = activities
@@ -1170,11 +1162,6 @@ def route_agent(
     #
     # --------------------------------------------------------
 
-    print(
-        "\nROUTE:",
-        route
-    )
-
     return {
 
         "route": route,
@@ -1196,109 +1183,6 @@ def route_agent(
         )
     }
 
-
-def compact_hotel_results(value: Any, limit: int = 8) -> str:
-    """Normalize Tavily/MCP hotel search results into concise hotel suggestions."""
-
-    data = extract_json(value)
-    hotels = []
-
-    def add_hotel(name, content="", url="", score=None):
-        if not name:
-            return
-
-        name = str(name).strip()
-        content = str(content or "").strip()
-
-        # Ignore generic search/article titles where possible.
-        generic_terms = (
-            "guide to",
-            "ultimate guide",
-            "best hotels",
-            "top 10 hotels",
-            "what are top hotels",
-        )
-
-        if any(term in name.casefold() for term in generic_terms):
-            # Still inspect the content for actual hotel names.
-            pass
-
-        hotels.append({
-            "name": name,
-            "content": content[:700],
-            "url": str(url or ""),
-            "score": score,
-        })
-
-    def collect(node):
-        if node is None:
-            return
-
-        if isinstance(node, str):
-            nested = extract_json(node)
-            if nested is not None:
-                collect(nested)
-            return
-
-        if isinstance(node, list):
-            for item in node:
-                if len(hotels) >= limit:
-                    break
-                collect(item)
-            return
-
-        if not isinstance(node, dict):
-            return
-
-        # MCP/Tavily wrapper
-        if isinstance(node.get("results"), list):
-            collect(node["results"])
-            return
-
-        # MCP text wrapper
-        if isinstance(node.get("text"), str):
-            collect(node["text"])
-            return
-
-        # Direct search result
-        title = node.get("title") or node.get("name")
-
-        if title:
-            add_hotel(
-                name=title,
-                content=node.get("content") or node.get("description"),
-                url=node.get("url"),
-                score=node.get("score"),
-            )
-            return
-
-        for value in node.values():
-            if len(hotels) >= limit:
-                break
-            collect(value)
-
-    collect(data)
-
-    # Remove duplicate titles.
-    unique = []
-    seen = set()
-
-    for hotel in hotels:
-        key = hotel["name"].casefold()
-
-        if key in seen:
-            continue
-
-        seen.add(key)
-        unique.append(hotel)
-
-    return safe_json(
-        {
-            "status": "success" if unique else "unavailable",
-            "results": unique[:limit],
-        },
-        6000,
-    )
 
 # ============================================================
 # FLIGHT AGENT
@@ -1324,8 +1208,6 @@ async def flight_agent(
     - If that second request is unavailable, fall back to an
       independent one-way return search for the exact return date.
     """
-
-    print("\nINSIDE FLIGHT AGENT\n")
 
     source = state["source"].strip()
     destination = state.get(
@@ -1378,17 +1260,6 @@ async def flight_agent(
         }
 
     try:
-        print(f"SOURCE: {source}")
-        print(f"DESTINATION: {destination}")
-        print(f"OUTBOUND DATE: {travel_date}")
-        print(
-            "RETURN DATE:",
-            trip_return_date(
-                travel_date,
-                state["days"]
-            ).isoformat()
-        )
-
         flight_result = await serp_mcp_call(
             "search_trip_flights",
             {
@@ -1428,10 +1299,6 @@ async def flight_agent(
             raise ValueError(
                 "Serp Flight MCP returned an unsupported response."
             )
-
-        print("\n========== STRUCTURED FLIGHT DATA ==========")
-        print(safe_json(flight_data, 14000))
-        print("=============================================\n")
 
         return {
             "flight_results": json.dumps(
@@ -2013,18 +1880,6 @@ Do not invent availability.
 
         }
 
-        print(
-            "\nEXTRACTED HOTEL DATA:"
-        )
-
-        print(
-            json.dumps(
-                hotel_data,
-                ensure_ascii=False,
-                indent=2
-            )[:5000]
-        )
-
     except Exception as exc:
 
         print(
@@ -2083,8 +1938,6 @@ Do not invent availability.
 # ============================================================
 
 async def weather_agent(state: TravelState):
-
-    print("\nINSIDE WEATHER AGENT\n")
 
     destination = state.get(
         "planning_destination",
@@ -2313,9 +2166,6 @@ async def weather_agent(state: TravelState):
             5000
         )
 
-        print("\nCOMPACT WEATHER:")
-        print(weather_text)
-
     except Exception as exc:
 
         print(
@@ -2361,10 +2211,6 @@ async def weather_agent(state: TravelState):
 def itinerary_agent(
     state: TravelState
 ):
-
-    print(
-        "\nINSIDE ITINERARY AGENT\n"
-    )
 
     route = state.get(
         "route",
@@ -2944,13 +2790,6 @@ Return ONLY the structured Itinerary object.
             # ------------------------------------------------
 
             if len(activities) > 6:
-                
-                print(
-                    f"Day {index}: LLM returned "
-                    f"{len(activities)} activities. "
-                    f"Trimming to 6 locally."
-                )
-
                 day["activities"] = (
                     activities[:6]
                 )
@@ -3012,31 +2851,6 @@ Return ONLY the structured Itinerary object.
         )
 
         # ----------------------------------------------------
-        # DEBUG OUTPUT
-        # ----------------------------------------------------
-
-        print(
-            "\n========== GENERATED ITINERARY =========="
-        )
-
-        print(
-            json.dumps(
-                itinerary,
-                indent=2,
-                ensure_ascii=False
-            )
-        )
-
-        print(
-            "LLM CALLS:",
-            llm_calls
-        )
-
-        print(
-            "==========================================\n"
-        )
-
-        # ----------------------------------------------------
         # RETURN
         # ----------------------------------------------------
         
@@ -3083,10 +2897,6 @@ Return ONLY the structured Itinerary object.
 def final_agent(
     state: TravelState
 ):
-
-    print(
-        "\nINSIDE FINAL AGENT\n"
-    )
 
     itinerary = state.get(
         "itinerary",
@@ -3763,6 +3573,44 @@ def final_agent(
                 match,
                 text[:400]
             )
+
+        # ----------------------------------------------------
+        # PATTERN 5
+        #
+        # Fallback: simple property keyword detection
+        # without requiring specific context patterns.
+        #
+        # Matches anything like:
+        # "Hotel Flor Rivoli"
+        # "Hostel Central Paris"
+        # "Resort & Spa"
+        #
+        # This is more permissive than the others but helps
+        # catch real properties that don't fit structured patterns.
+        # The save_hotel_name function still applies all the
+        # filtering rules (blocked phrases, sentence words, etc.)
+        # so the false positive rate is minimized.
+        # ----------------------------------------------------
+
+        simple_property_pattern = (
+            r"\b"
+            r"([A-Z][A-Za-z0-9&' .\-]{2,80}"
+            r"(?:Hotel|Resort|Inn|Suites|Rotana|"
+            r"Residence|Residences|Apartments|"
+            r"Hostel|Villa|Lodge)"
+            r"(?:\s+[A-Za-z0-9&'\-]{1,40})?)"
+            r"(?=\s|[.,;!]|$)"
+        )
+
+        for match in re.findall(
+            simple_property_pattern,
+            text
+        ):
+            save_hotel_name(
+                match,
+                text[:400]
+            )
+
     def collect_hotel_items(value):
 
         if value is None:
@@ -4335,6 +4183,25 @@ def final_agent(
         parts
     )
 
+    # --------------------------------------------------------
+    # PREPARE HOTEL SUGGESTIONS FOR API
+    # --------------------------------------------------------
+    # Convert cleaned hotel names to simple format:
+    # Just name and short description from content
+    
+    hotel_suggestions = []
+    
+    if unique_hotels:
+        for hotel in unique_hotels[:8]:
+            name = hotel.get("name", "")
+            url = hotel.get("url", "")
+            
+            if name:
+                hotel_suggestions.append({
+                    "name": name,
+                    "url": url or ""
+                })
+
     return {
 
         "final_answer":
@@ -4342,6 +4209,12 @@ def final_agent(
 
         "score":
             calculate_score(state),
+
+        "hotel_suggestions":
+            json.dumps(
+                hotel_suggestions,
+                ensure_ascii=False
+            ),
 
         "messages": [
             AIMessage(
@@ -4789,6 +4662,9 @@ Interests:
         "hotel_results":
             "",
 
+        "hotel_suggestions":
+            "",
+
         "weather_results":
             "",
 
@@ -4881,6 +4757,12 @@ Interests:
         "hotel_results":
             result.get(
                 "hotel_results",
+                ""
+            ),
+
+        "hotel_suggestions":
+            result.get(
+                "hotel_suggestions",
                 ""
             ),
 

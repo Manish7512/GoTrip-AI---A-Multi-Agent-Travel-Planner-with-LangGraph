@@ -436,11 +436,6 @@ async function callTravelBackend(trip) {
     const payload =
         buildPayload(trip);
 
-    console.log(
-        "GoTrip API request:",
-        payload
-    );
-
     const response =
         await fetch(
             "/api/travel",
@@ -475,11 +470,6 @@ async function callTravelBackend(trip) {
             "Server returned an invalid JSON response."
         );
     }
-
-    console.log(
-        "GoTrip API response:",
-        data
-    );
 
     if (
         !response.ok ||
@@ -2004,11 +1994,6 @@ function normalizeFlightData(value) {
             parsed ?? value
         );
 
-    console.log(
-        "[GoTrip] normalized flight data:",
-        result
-    );
-
     return result;
 }
 
@@ -2030,16 +2015,6 @@ function renderFlightResults(value) {
         normalizeFlightData(
             value
         );
-
-    console.log(
-        "[GoTrip] renderFlightResults input:",
-        value
-    );
-
-    console.log(
-        "[GoTrip] renderFlightResults normalized:",
-        flight
-    );
 
     if (
         !flight ||
@@ -2884,158 +2859,6 @@ function renderFlightResults(value) {
 
 
 /* ============================================================
-   HOTEL NORMALIZER
-   ============================================================ */
-
-function normalizeHotelData(value) {
-
-    const data =
-        parseMCPResponse(
-            value
-        );
-
-    if (!data) {
-        return [];
-    }
-
-    function collect(
-        value
-    ) {
-
-        if (!value) {
-            return [];
-        }
-
-        if (
-            Array.isArray(value)
-        ) {
-
-            let results = [];
-
-            for (
-                const item of value
-            ) {
-
-                results.push(
-                    ...collect(item)
-                );
-            }
-
-            return results;
-        }
-
-        if (
-            typeof value ===
-            "string"
-        ) {
-
-            return collect(
-                parseMCPResponse(
-                    value
-                )
-            );
-        }
-
-        if (
-            typeof value !==
-            "object"
-        ) {
-
-            return [];
-        }
-
-        if (
-            Array.isArray(
-                value.results
-            )
-        ) {
-
-            return collect(
-                value.results
-            );
-        }
-
-        if (
-            typeof value.text ===
-            "string"
-        ) {
-
-            return collect(
-                value.text
-            );
-        }
-
-        if (
-            value.title ||
-            value.name ||
-            value.url
-        ) {
-
-            return [
-                value
-            ];
-        }
-
-        let results = [];
-
-        for (
-            const nested of
-            Object.values(value)
-        ) {
-
-            results.push(
-                ...collect(
-                    nested
-                )
-            );
-        }
-
-        return results;
-    }
-
-    const hotels =
-        collect(
-            data
-        );
-
-    const seen =
-        new Set();
-
-    return hotels.filter(
-        hotel => {
-
-            const title =
-                hotel?.title ||
-                hotel?.name ||
-                hotel?.url ||
-                "";
-
-            const key =
-                String(
-                    title
-                )
-                    .trim()
-                    .toLowerCase();
-
-            if (
-                !key ||
-                seen.has(key)
-            ) {
-
-                return false;
-            }
-
-            seen.add(
-                key
-            );
-
-            return true;
-        }
-    );
-}
-
-
-/* ============================================================
    HOTEL RENDERER
    ============================================================ */
 
@@ -3048,10 +2871,19 @@ function renderHotelResults(value) {
         return;
     }
 
-    const hotels =
-        normalizeHotelData(
-            value
-        );
+    // Parse hotel_suggestions (cleaned names from backend extraction)
+    let hotels = [];
+    
+    if (typeof value === "string" && value.trim()) {
+        try {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed)) {
+                hotels = parsed;
+            }
+        } catch (e) {
+            console.warn("Could not parse hotel_suggestions JSON:", e);
+        }
+    }
 
     if (
         !hotels.length
@@ -3059,7 +2891,7 @@ function renderHotelResults(value) {
 
         element.innerHTML = `
             <div class="result-empty">
-                No hotel information was returned.
+                No hotel suggestions were extracted.
             </div>
         `;
 
@@ -3080,8 +2912,7 @@ function renderHotelResults(value) {
                     .map(
                         hotel => {
 
-                            const title =
-                                hotel?.title ||
+                            const name =
                                 hotel?.name ||
                                 "Hotel suggestion";
 
@@ -3089,58 +2920,16 @@ function renderHotelResults(value) {
                                 hotel?.url ||
                                 "";
 
-                            const content =
-                                hotel?.content ||
-                                hotel?.description ||
-                                "";
-
-                            const image =
-                                hotel?.image ||
-                                "";
-
                             return `
                                 <div class="hotel-card">
-
-                                    ${
-                                        image
-                                            ? `
-                                                <img
-                                                    src="${escapeHtml(
-                                                        image
-                                                    )}"
-                                                    alt="${escapeHtml(
-                                                        title
-                                                    )}"
-                                                    loading="lazy"
-                                                >
-                                            `
-                                            : ""
-                                    }
 
                                     <div class="hotel-card-body">
 
                                         <h3>
                                             ${escapeHtml(
-                                                title
+                                                name
                                             )}
                                         </h3>
-
-                                        ${
-                                            content
-                                                ? `
-                                                    <p>
-                                                        ${escapeHtml(
-                                                            String(
-                                                                content
-                                                            ).slice(
-                                                                0,
-                                                                500
-                                                            )
-                                                        )}
-                                                    </p>
-                                                `
-                                                : ""
-                                        }
 
                                         ${
                                             url
@@ -3157,6 +2946,18 @@ function renderHotelResults(value) {
                                                 `
                                                 : ""
                                         }
+                                    </div>
+
+                                </div>
+                            `;
+                        }
+                    )
+                    .join("")
+            }
+
+        </div>
+    `;
+}
 
                                     </div>
 
@@ -3442,15 +3243,23 @@ function renderBudget(data) {
      */
     if (hotel) {
 
-        const hotelData =
-            normalizeHotelData(
-                data?.hotel_results
-            );
+        let hotelCount = 0;
+        
+        if (typeof data?.hotel_suggestions === "string" && data.hotel_suggestions.trim()) {
+            try {
+                const suggestions = JSON.parse(data.hotel_suggestions);
+                if (Array.isArray(suggestions)) {
+                    hotelCount = suggestions.length;
+                }
+            } catch (e) {
+                // Failed to parse, count stays 0
+            }
+        }
 
         hotel.textContent =
-            hotelData.length
+            hotelCount > 0
 
-                ? `${hotelData.length} options`
+                ? `${hotelCount} options`
 
                 : "Unavailable";
     }
@@ -4080,11 +3889,6 @@ COMPLETE BACKEND RESULT
 
 function renderAllBackendResults(data) {
 
-    console.log(
-        "[GoTrip] Rendering backend results:",
-        data
-    );
-
     const renderers = [
 
         [
@@ -4099,7 +3903,7 @@ function renderAllBackendResults(data) {
             "hotels",
             () =>
                 renderHotelResults(
-                    data?.hotel_results
+                    data?.hotel_suggestions
                 )
         ],
 
@@ -4150,10 +3954,6 @@ function renderAllBackendResults(data) {
 
             renderer();
 
-            console.log(
-                `[GoTrip] ${name} renderer OK`
-            );
-
         } catch (error) {
 
             console.error(
@@ -4169,49 +3969,6 @@ function displayTravelResult(data) {
 
     currentResult =
         data;
-
-    console.log(
-        "========== GOTRIP RESULT =========="
-    );
-
-    console.log(
-        "FULL RESPONSE:",
-        data
-    );
-
-    console.log(
-        "REQUEST:",
-        data?.request
-    );
-
-    console.log(
-        "FLIGHTS:",
-        data?.flight_results
-    );
-
-    console.log(
-        "HOTELS:",
-        data?.hotel_results
-    );
-
-    console.log(
-        "WEATHER:",
-        data?.weather_results
-    );
-
-    console.log(
-        "ITINERARY:",
-        data?.itinerary
-    );
-
-    console.log(
-        "FINAL ANSWER:",
-        data?.final_answer
-    );
-
-    console.log(
-        "===================================="
-    );
 
     /*
      * Synchronize request data from backend.
@@ -4281,9 +4038,6 @@ function displayTravelResult(data) {
     currentDay =
         0;
 
-    console.log(
-        "[GoTrip] All backend results rendered."
-    );
 }
 
 
@@ -4751,7 +4505,7 @@ async function sendChatMessage() {
         );
 
         renderHotelResults(
-            data?.hotel_results
+            data?.hotel_suggestions
         );
 
         renderWeatherResults(
@@ -5196,9 +4950,6 @@ function initialize() {
         null
     );
 
-    console.log(
-        "GoTrip AI frontend initialized."
-    );
 }
 
 
