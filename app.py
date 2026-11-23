@@ -32,7 +32,7 @@ app.mount(
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 
-class TravelRequest(BaseModel):
+class TravelRequest(BaseModel):        # Pydantic request model for validates the request
     """
     Preferred frontend payload:
 
@@ -195,7 +195,7 @@ async def home(request: Request):
 @app.post("/api/travel")
 async def travel_planner(request_data: TravelRequest):
     
-    payload = request_data.model_dump()
+    payload = request_data.model_dump()     # model_dump() converts the validated Pydantic model into a Python dictionary
 
     try:
         result = await run_travel_agent(

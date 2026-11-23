@@ -39,48 +39,6 @@ def get_current_weather(city: str):
         "condition": data["weather"][0]["description"],
         "wind_speed": data["wind"]["speed"]
     }
-
-# @mcp.tool()   
-# def get_forecast(city: str):
-    
-#     url = (
-#         "https://api.openweathermap.org/data/2.5/forecast"
-#     )
-    
-#     params = {
-#         "q": city,
-#         "appid": OPEN_WEATHER_API_KEY,
-#         "units": "metric"
-#     }
-    
-#     response = requests.get(
-#         url,
-#         params=params
-#     )
-    
-#     data = response.json()
-    
-#     forecast = []
-    
-    
-#     # Return First 5 Forecast Entries
-    
-#     for item in data["list"][:5]:
-        
-#         forecast.append(
-#             {
-#                 "datetime": item["dt_txt"],
-#                 "temperature": item["main"]["temp"],
-#                 "weather": item["weather"][0]["description"]
-#             }
-#         )
-        
-#     return {
-#         "city": city,
-#         "forecast": forecast
-#     }
-    
-    
     
     
 @mcp.tool()
@@ -149,8 +107,6 @@ def get_forecast(city: str, days: int = 5):
         ),
         "forecast": forecast
     }    
-    
-
     
 if __name__ == "__main__":
     mcp.run()

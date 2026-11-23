@@ -76,7 +76,7 @@ from mcp_client import (
 load_dotenv()
 
 os.environ["SSL_CERT_FILE"] = certifi.where()
-os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
+os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()       #helps avoid certificate verification errors in the application environment
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
